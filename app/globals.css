@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #111111;
+  --color-paper: #ffffff;
+  --color-cream: #f5f1e8;
+  --color-power: #f5c400;
+  --color-power-deep: #e3b500;
+  --color-muted: #5e5a52;
+  --color-line: rgba(17, 17, 17, 0.08);
+  --color-line-strong: rgba(17, 17, 17, 0.16);
+
+  --radius-control: 6px;
+  --radius-frame: 12px;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@theme inline {
+  --font-display: var(--font-cabinet), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background-color: var(--color-power);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* MapLibre chrome, recolored to the brand */
+.maplibregl-map {
+  font-family: var(--font-sans);
+}
+
+.maplibregl-popup-content {
+  background: var(--color-paper);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-frame);
+  box-shadow: none;
+  padding: 12px 14px;
+  color: var(--color-ink);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: var(--color-paper);
+}
+
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: var(--color-paper);
+}
+
+.maplibregl-ctrl-group {
+  background: var(--color-paper);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--color-line);
+}
+
+.maplibregl-ctrl-attrib {
+  font-family: var(--font-sans);
+  font-size: 11px;
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-frame);
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--color-muted);
+}
+
+.maplibregl-cooperative-gesture-screen {
+  background: rgba(17, 17, 17, 0.72);
+  font-family: var(--font-sans);
+  font-size: 15px;
+}
