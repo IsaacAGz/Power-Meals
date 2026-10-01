@@ -37,7 +37,7 @@ export function OrderForm() {
   const [metodo, setMetodo] = useState<Metodo>("entrega");
   const [zona, setZona] = useState("");
   const [direccion, setDireccion] = useState("");
-  const [punto, setPunto] = useState(startingPoint?.slug ?? "");
+  const [punto, setPunto] = useState("");
   const [notas, setNotas] = useState("");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [errors, setErrors] = useState<Errors>({});
