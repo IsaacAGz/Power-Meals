@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import { Reveal } from "@/components/Reveal";
 import { LocationsExplorer } from "@/components/map/LocationsExplorer";
 import { container, textLink } from "@/lib/ui";
-import { buildWhatsAppUrl, ZONE_QUESTION_MESSAGE } from "@/lib/whatsapp";
+import { buildWhatsAppUrl, PICKUP_QUESTION_MESSAGE } from "@/lib/whatsapp";
 
 export const metadata: Metadata = {
   title: "Ubicaciones",
-  description: "Zonas de entrega y puntos de recolección de Power Meals en Tijuana.",
+  description: "Puntos de recolección de Power Meals en Tijuana.",
 };
 
 export default function UbicacionesPage() {
@@ -18,9 +18,9 @@ export default function UbicacionesPage() {
         </Reveal>
         <Reveal onMount delay={0.08}>
           <p className="mt-6 max-w-[56ch] text-lg leading-relaxed text-muted">
-            Entregamos en cinco zonas de Tijuana y tenemos dos puntos de recolección. ¿Tu colonia no aparece?{" "}
-            <a href={buildWhatsAppUrl(ZONE_QUESTION_MESSAGE)} target="_blank" rel="noopener noreferrer" className={textLink}>
-              Pregunta por tu zona
+            Recoge tu pedido en estos puntos de Tijuana. ¿Necesitas otro horario o lugar?{" "}
+            <a href={buildWhatsAppUrl(PICKUP_QUESTION_MESSAGE)} target="_blank" rel="noopener noreferrer" className={textLink}>
+              Pregúntanos
             </a>
             .
           </p>

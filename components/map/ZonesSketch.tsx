@@ -1,47 +1,35 @@
-import { pickupPoints, zones, zonesBounds, type LngLat } from "@/lib/locations-data";
+import { pickupPoints, pointsBounds, type LngLat } from "@/lib/locations-data";
 
 const WIDTH = 1000;
 
 export function ZonesSketch({ showPickupPoints = true, className = "" }: { showPickupPoints?: boolean; className?: string }) {
-  const [[minLng, minLat], [maxLng, maxLat]] = zonesBounds();
+  const [[minLng, minLat], [maxLng, maxLat]] = pointsBounds();
   const latScale = Math.cos(((minLat + maxLat) / 2) * (Math.PI / 180));
   const scale = WIDTH / (maxLng - minLng);
   const height = (maxLat - minLat) * scale * (1 / latScale);
-  const pad = 40;
+  const pad = 48;
 
   const project = ([lng, lat]: LngLat) =>
     [((lng - minLng) * scale).toFixed(1), (((maxLat - lat) * scale) / latScale).toFixed(1)] as const;
 
   return (
     <svg
-      viewBox={`${-pad} ${-pad - 30} ${WIDTH + pad * 2} ${height + pad * 2 + 30}`}
+      viewBox={`${-pad} ${-pad} ${WIDTH + pad * 2} ${height + pad * 2}`}
       className={className}
       role="img"
-      aria-label={`Zonas de entrega: ${zones.map((zone) => zone.name).join(", ")}`}
+      aria-label={`Puntos de recolección: ${pickupPoints.map((point) => point.name).join(", ")}`}
     >
-      {zones.map((zone) => {
-        const [cx] = project(zone.center);
-        const top = Math.min(...zone.ring.map((point) => +project(point)[1]));
-        return (
-          <g key={zone.slug}>
-            <polygon
-              points={zone.ring.map((point) => project(point).join(",")).join(" ")}
-              fill="#F5C400"
-              fillOpacity={0.3}
-              stroke="#111111"
-              strokeWidth={1.5}
-              vectorEffect="non-scaling-stroke"
-            />
-            <text x={cx} y={top - 12} textAnchor="middle" fontSize={24} fontWeight={600} className="fill-ink font-sans">
-              {zone.name}
-            </text>
-          </g>
-        );
-      })}
       {showPickupPoints &&
         pickupPoints.map((point) => {
           const [x, y] = project(point.coordinates);
-          return <rect key={point.slug} x={+x - 9} y={+y - 9} width={18} height={18} rx={5} fill="#111111" />;
+          return (
+            <g key={point.slug}>
+              <rect x={+x - 10} y={+y - 10} width={20} height={20} rx={5} fill="#111111" />
+              <text x={+x} y={+y - 22} textAnchor="middle" fontSize={22} fontWeight={600} className="fill-ink font-sans">
+                {point.name}
+              </text>
+            </g>
+          );
         })}
     </svg>
   );
