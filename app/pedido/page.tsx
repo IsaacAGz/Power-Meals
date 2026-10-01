@@ -71,7 +71,11 @@ export default async function PedidoPage({ searchParams }: PageProps<"/pedido">)
         </aside>
 
         <div>
-          <OrderForm initialZona={first(params.zona)} initialPlatillo={first(params.platillo)} />
+          <OrderForm
+            initialZona={first(params.zona)}
+            initialPlatillo={first(params.platillo)}
+            initialPunto={first(params.punto)}
+          />
           <PaymentDetails className="mt-16 lg:hidden" />
         </div>
       </div>

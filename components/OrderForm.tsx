@@ -28,17 +28,26 @@ const inputBase =
 const inputClass = (invalid: boolean) =>
   `${inputBase} h-12 ${invalid ? "border-[#B42318]" : "border-line-strong"}`;
 
-export function OrderForm({ initialZona, initialPlatillo }: { initialZona?: string; initialPlatillo?: string }) {
+export function OrderForm({
+  initialZona,
+  initialPlatillo,
+  initialPunto,
+}: {
+  initialZona?: string;
+  initialPlatillo?: string;
+  initialPunto?: string;
+}) {
   const reduce = useReducedMotion();
   const formRef = useRef<HTMLFormElement>(null);
   const startingDish = getDish(initialPlatillo);
+  const startingPoint = getPickupPoint(initialPunto);
 
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [metodo, setMetodo] = useState<Metodo>("entrega");
+  const [metodo, setMetodo] = useState<Metodo>(startingPoint ? "recoleccion" : "entrega");
   const [zona, setZona] = useState(getZone(initialZona)?.slug ?? "");
   const [direccion, setDireccion] = useState("");
-  const [punto, setPunto] = useState("");
+  const [punto, setPunto] = useState(startingPoint?.slug ?? "");
   const [notas, setNotas] = useState("");
   const [quantities, setQuantities] = useState<Record<string, number>>(
     startingDish ? { [startingDish.slug]: 1 } : {},

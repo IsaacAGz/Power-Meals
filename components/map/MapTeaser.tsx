@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "@phosphor-icons/react";
-import { zones } from "@/lib/locations-data";
+import { pickupPoints } from "@/lib/locations-data";
 import { buttonDark, container } from "@/lib/ui";
 
 const BrandMap = dynamic(() => import("./BrandMap"), {
@@ -40,7 +40,6 @@ export function MapTeaser() {
         {visible && (
           <BrandMap
             interactive={false}
-            showPickupPoints={false}
             padding={
               wide
                 ? { top: 60, right: 60, bottom: 60, left: 520 }
@@ -53,13 +52,13 @@ export function MapTeaser() {
         <div className={`${container} pointer-events-none relative flex h-full items-end pb-6 md:items-center md:pb-0`}>
           <div className="pointer-events-auto w-full max-w-[400px] rounded-frame border border-line-strong bg-cream p-6 sm:p-8">
             <h2 id="teaser-mapa" className="font-display text-3xl font-extrabold tracking-tight md:text-4xl">
-              Entregamos en Tijuana
+              Recoge en Tijuana
             </h2>
             <p className="mt-3 text-[15px] leading-relaxed text-muted">
-              {zones.map((zone) => zone.name).join(", ")}. También puedes recoger en uno de nuestros puntos.
+              {pickupPoints.map((point) => point.name).join(", ")}.
             </p>
             <Link href="/ubicaciones" className={`${buttonDark} mt-6`}>
-              Ver zonas
+              Ver puntos
               <ArrowRight weight="bold" className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
           </div>
