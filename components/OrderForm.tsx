@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowCounterClockwise,
   CaretDown,
@@ -28,33 +28,34 @@ const inputBase =
 const inputClass = (invalid: boolean) =>
   `${inputBase} h-12 ${invalid ? "border-[#B42318]" : "border-line-strong"}`;
 
-export function OrderForm({
-  initialZona,
-  initialPlatillo,
-  initialPunto,
-}: {
-  initialZona?: string;
-  initialPlatillo?: string;
-  initialPunto?: string;
-}) {
+export function OrderForm() {
   const reduce = useReducedMotion();
   const formRef = useRef<HTMLFormElement>(null);
-  const startingDish = getDish(initialPlatillo);
-  const startingPoint = getPickupPoint(initialPunto);
 
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [metodo, setMetodo] = useState<Metodo>(startingPoint ? "recoleccion" : "entrega");
-  const [zona, setZona] = useState(getZone(initialZona)?.slug ?? "");
+  const [metodo, setMetodo] = useState<Metodo>("entrega");
+  const [zona, setZona] = useState("");
   const [direccion, setDireccion] = useState("");
-  const [punto, setPunto] = useState(startingPoint?.slug ?? "");
+  const [punto, setPunto] = useState("");
   const [notas, setNotas] = useState("");
-  const [quantities, setQuantities] = useState<Record<string, number>>(
-    startingDish ? { [startingDish.slug]: 1 } : {},
-  );
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [errors, setErrors] = useState<Errors>({});
   const [status, setStatus] = useState<Status>("idle");
   const [whatsAppUrl, setWhatsAppUrl] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const zone = getZone(params.get("zona"));
+    const dish = getDish(params.get("platillo"));
+    const point = getPickupPoint(params.get("punto"));
+    if (zone) setZona(zone.slug);
+    if (dish) setQuantities((current) => ({ ...current, [dish.slug]: current[dish.slug] || 1 }));
+    if (point) {
+      setMetodo("recoleccion");
+      setPunto(point.slug);
+    }
+  }, []);
 
   const lines: OrderLine[] = useMemo(
     () =>
