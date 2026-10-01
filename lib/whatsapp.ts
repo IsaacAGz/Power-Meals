@@ -52,5 +52,5 @@ export function buildOrderMessage(order: OrderSummary) {
 }
 
 export const GENERAL_MESSAGE = "Hola Power Meals, tengo una pregunta.";
-export const ZONE_QUESTION_MESSAGE = "Hola Power Meals, ¿entregan en mi zona? Mi colonia es: ";
+export const PICKUP_QUESTION_MESSAGE = "Hola Power Meals, ¿puedo recoger en otro punto? ";
 export const PARTNER_MESSAGE = "Hola Power Meals, me interesa ser partner. Mi negocio es: ";
