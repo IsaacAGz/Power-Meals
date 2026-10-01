@@ -20,10 +20,6 @@ const bankRows = [
   { label: "Titular", value: "Power Meals" },
 ];
 
-function first(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
 function PaymentDetails({ className = "" }: { className?: string }) {
   return (
     <div className={className}>
@@ -56,9 +52,7 @@ function PaymentDetails({ className = "" }: { className?: string }) {
   );
 }
 
-export default async function PedidoPage({ searchParams }: PageProps<"/pedido">) {
-  const params = await searchParams;
-
+export default function PedidoPage() {
   return (
     <section className="pt-12 pb-24 md:pt-20 md:pb-32">
       <div className={`${container} grid gap-12 lg:grid-cols-[4fr_7fr] lg:gap-20`}>
@@ -71,7 +65,7 @@ export default async function PedidoPage({ searchParams }: PageProps<"/pedido">)
         </aside>
 
         <div>
-          <OrderForm initialZona={first(params.zona)} initialPlatillo={first(params.platillo)} />
+          <OrderForm />
           <PaymentDetails className="mt-16 lg:hidden" />
         </div>
       </div>
