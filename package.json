@@ -9,24 +9,34 @@
     "prebuild": "node scripts/copy-maplibre-worker.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx --env-file-if-exists=.env scripts/seed-from-static-data.ts",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
+    "drizzle-orm": "^0.45.4",
+    "ioredis": "^6.0.0",
     "maplibre-gl": "^6.11.2",
     "motion": "^13.4.6",
     "next": "16.3.7",
+    "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.3.7",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }
