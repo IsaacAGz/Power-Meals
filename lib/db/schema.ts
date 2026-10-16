@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   check,
   doublePrecision,
@@ -41,6 +42,16 @@ export const fulfillmentType = pgEnum("fulfillment_type", ["delivery", "pickup"]
 
 export const paymentStatus = pgEnum("payment_status", ["pending", "succeeded", "failed", "refunded"]);
 
+export const portionSize = pgEnum("portion_size", ["regular", "plus"]);
+
+export const plateStyle = pgEnum("plate_style", ["balanced", "double_carb"]);
+
+export const proteinTier = pgEnum("protein_tier", ["base", "premium"]);
+
+export const cartLineSource = pgEnum("cart_line_source", ["builder", "template", "reorder", "package"]);
+
+export const orderLineKind = pgEnum("order_line_kind", ["meal", "package", "package_slot"]);
+
 export const kitchenFacilities = pgTable("kitchen_facilities", {
   id: uuid("id").primaryKey().defaultRandom(),
   slug: text("slug").notNull().unique(),
@@ -51,7 +62,7 @@ export const kitchenFacilities = pgTable("kitchen_facilities", {
   ...timestamps,
 });
 
-export const categories = pgTable("categories", {
+export const catalogFilters = pgTable("catalog_filters", {
   id: uuid("id").primaryKey().defaultRandom(),
   slug: text("slug").notNull().unique(),
   label: text("label").notNull(),
@@ -59,25 +70,117 @@ export const categories = pgTable("categories", {
   ...timestamps,
 });
 
-export const dishes = pgTable(
-  "dishes",
+export const proteins = pgTable(
+  "proteins",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     slug: text("slug").notNull().unique(),
-    categoryId: uuid("category_id")
-      .notNull()
-      .references(() => categories.id),
     name: text("name").notNull(),
-    description: text("description").notNull(),
-    priceCents: integer("price_cents").notNull(),
-    imageUrl: text("image_url").notNull(),
+    tier: proteinTier("tier").notNull(),
+    // Added to the portion size's base price.
+    regularUpgradeCents: integer("regular_upgrade_cents").notNull().default(0),
+    plusUpgradeCents: integer("plus_upgrade_cents").notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     ...timestamps,
   },
   (table) => [
-    index("dishes_category_idx").on(table.categoryId),
-    check("dishes_price_positive", sql`${table.priceCents} > 0`),
+    check("proteins_upgrade_non_negative", sql`${table.regularUpgradeCents} >= 0 AND ${table.plusUpgradeCents} >= 0`),
+  ],
+);
+
+export const carbBases = pgTable("carb_bases", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  // Ensalada has no carb portion, so it can't be doubled.
+  hasCarbPortion: boolean("has_carb_portion").notNull().default(true),
+  includesVeggies: boolean("includes_veggies").notNull().default(true),
+  allowsDoubleCarb: boolean("allows_double_carb").notNull().default(true),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  ...timestamps,
+});
+
+export const portionSizes = pgTable(
+  "portion_sizes",
+  {
+    size: portionSize("size").primaryKey(),
+    label: text("label").notNull(),
+    basePriceCents: integer("base_price_cents").notNull(),
+    proteinGrams: integer("protein_grams").notNull(),
+    carbGrams: integer("carb_grams").notNull(),
+    vegGrams: integer("veg_grams").notNull(),
+    doubleCarbGrams: integer("double_carb_grams").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [check("portion_sizes_price_positive", sql`${table.basePriceCents} > 0`)],
+);
+
+export const mealTemplates = pgTable(
+  "meal_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    description: text("description").notNull(),
+    proteinId: uuid("protein_id")
+      .notNull()
+      .references(() => proteins.id),
+    carbBaseId: uuid("carb_base_id")
+      .notNull()
+      .references(() => carbBases.id),
+    imageUrl: text("image_url").notNull(),
+    skuRegular: text("sku_regular"),
+    skuPlus: text("sku_plus"),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex("meal_templates_composition_idx").on(table.proteinId, table.carbBaseId)],
+);
+
+export const mealTemplateFilters = pgTable(
+  "meal_template_filters",
+  {
+    templateId: uuid("template_id")
+      .notNull()
+      .references(() => mealTemplates.id, { onDelete: "cascade" }),
+    filterId: uuid("filter_id")
+      .notNull()
+      .references(() => catalogFilters.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.templateId, table.filterId] })],
+);
+
+export type MealPackageRules = {
+  /** When set, every slot must use one of these protein slugs. */
+  proteinSlugs?: string[];
+  /** Premium proteins add their per-meal upgrade to the package price. */
+  premiumSurcharge: boolean;
+};
+
+export const mealPackages = pgTable(
+  "meal_packages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull().unique(),
+    productSlug: text("product_slug").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull(),
+    mealCount: integer("meal_count").notNull(),
+    size: portionSize("size").notNull(),
+    priceCents: integer("price_cents").notNull(),
+    rules: jsonb("rules").$type<MealPackageRules>().notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("meal_packages_variant_idx").on(table.productSlug, table.mealCount, table.size),
+    check("meal_packages_price_positive", sql`${table.priceCents} > 0`),
+    check("meal_packages_meal_count_range", sql`${table.mealCount} BETWEEN 1 AND 30`),
   ],
 );
 
@@ -145,6 +248,8 @@ export const orders = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     orderNumber: serial("order_number").notNull().unique(),
+    // Bearer token for the sessionless Openpay return pages; also sent to Openpay as the charge order_id.
+    publicOrderRef: text("public_order_ref").notNull().unique(),
     userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     customerName: text("customer_name").notNull(),
     customerEmail: text("customer_email").notNull(),
@@ -175,24 +280,45 @@ export const orders = pgTable(
   ],
 );
 
-export const orderItems = pgTable(
-  "order_items",
+/**
+ * Frozen at order time. Package bundles are one "package" row (carries the price) plus one
+ * "package_slot" row per meal (price 0) pointing at it through parent_line_id.
+ */
+export const orderLineItems = pgTable(
+  "order_line_items",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     orderId: uuid("order_id")
       .notNull()
       .references(() => orders.id, { onDelete: "cascade" }),
-    dishId: uuid("dish_id")
-      .notNull()
-      .references(() => dishes.id),
-    dishName: text("dish_name").notNull(),
-    unitPriceCents: integer("unit_price_cents").notNull(),
+    parentLineId: uuid("parent_line_id").references((): AnyPgColumn => orderLineItems.id, { onDelete: "cascade" }),
+    kind: orderLineKind("kind").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
     quantity: integer("quantity").notNull(),
+    displayName: text("display_name").notNull(),
+    unitPriceCents: integer("unit_price_cents").notNull(),
     lineTotalCents: integer("line_total_cents").notNull(),
+    proteinId: uuid("protein_id").references(() => proteins.id),
+    carbBaseId: uuid("carb_base_id").references(() => carbBases.id),
+    portionSize: portionSize("portion_size"),
+    plateStyle: plateStyle("plate_style"),
+    proteinGrams: integer("protein_grams"),
+    carbGrams: integer("carb_grams"),
+    vegGrams: integer("veg_grams"),
+    salsaNote: text("salsa_note"),
+    templateId: uuid("template_id").references(() => mealTemplates.id),
+    packageId: uuid("package_id").references(() => mealPackages.id),
+    // Cart item as ordered (top-level lines only), so "Pedir de nuevo" can clone it.
+    item: jsonb("item"),
   },
   (table) => [
-    index("order_items_order_idx").on(table.orderId),
-    check("order_items_quantity_range", sql`${table.quantity} BETWEEN 1 AND 20`),
+    index("order_line_items_order_idx").on(table.orderId),
+    check("order_line_items_quantity_range", sql`${table.quantity} BETWEEN 1 AND 20`),
+    check("order_line_items_price_non_negative", sql`${table.unitPriceCents} >= 0 AND ${table.lineTotalCents} >= 0`),
+    check(
+      "order_line_items_slot_has_parent",
+      sql`(${table.kind} = 'package_slot') = (${table.parentLineId} IS NOT NULL)`,
+    ),
   ],
 );
 
@@ -238,35 +364,36 @@ export const openpayWebhookEvents = pgTable(
     eventType: text("event_type").notNull(),
     rawPayload: jsonb("raw_payload").notNull(),
     isDuplicate: boolean("is_duplicate").notNull().default(false),
+    // paid | failed change the order; duplicate | ignored | unknown_order | amount_mismatch don't.
+    outcome: text("outcome"),
     processedAt: timestamp("processed_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index("openpay_webhook_events_event_idx").on(table.openpayEventId),
     index("openpay_webhook_events_order_idx").on(table.orderId),
-    // Replays are logged as duplicates; only one non-duplicate row may exist per transaction and event type.
-    uniqueIndex("openpay_webhook_events_processed_once_idx")
+    // Only one event per transaction and type may change an order; everything else is audit only.
+    uniqueIndex("openpay_webhook_events_applied_once_idx")
       .on(table.openpayTransactionId, table.eventType)
-      .where(sql`${table.isDuplicate} = false`),
+      .where(sql`${table.outcome} IN ('paid', 'failed')`),
   ],
 );
 
-export const cartLines = pgTable(
-  "cart_lines",
+/** Logged-in working cart. Same item shape as the guest Redis cart; prices are re-resolved at checkout. */
+export const cartLineItems = pgTable(
+  "cart_line_items",
   {
+    id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    dishId: uuid("dish_id")
-      .notNull()
-      .references(() => dishes.id, { onDelete: "cascade" }),
+    lineKey: text("line_key").notNull(),
+    source: cartLineSource("source").notNull(),
+    item: jsonb("item").notNull(),
     quantity: integer("quantity").notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow()
-      .$onUpdate(() => new Date()),
+    ...timestamps,
   },
   (table) => [
-    primaryKey({ columns: [table.userId, table.dishId] }),
-    check("cart_lines_quantity_range", sql`${table.quantity} BETWEEN 1 AND 20`),
+    uniqueIndex("cart_line_items_user_line_idx").on(table.userId, table.lineKey),
+    check("cart_line_items_quantity_range", sql`${table.quantity} BETWEEN 1 AND 20`),
   ],
 );

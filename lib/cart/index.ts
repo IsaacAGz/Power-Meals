@@ -1,72 +1,188 @@
 import "server-only";
+import { and, count, eq, sql } from "drizzle-orm";
+import { getCatalog } from "@/lib/catalog";
+import { lineKey, MAX_CART_LINES, MAX_LINE_QUANTITY, parseCartItem, resolveLine, type ResolvedLine } from "@/lib/catalog/pricing";
+import type { CartItem } from "@/lib/catalog/types";
+import { getDb, schema, type Database } from "@/lib/db";
 import { getRedis } from "@/lib/redis";
-import { sessionTtlSeconds } from "@/lib/session";
+import { ensureSession, getSession, sessionTtlSeconds, type Session } from "@/lib/session";
 import { cartKey } from "./keys";
 
-export const MAX_LINE_QUANTITY = 20;
-export const MAX_CART_LINES = 50;
+export { MAX_LINE_QUANTITY } from "@/lib/catalog/pricing";
 
-// Phase 2 adds builder, template, and package-slot kinds alongside "dish".
-export type CartLineRef = { kind: "dish"; slug: string };
-export type CartLine = CartLineRef & { quantity: number };
-export type Cart = { lines: CartLine[]; updatedAt: number | null };
-
-const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** Guests keep their cart in Redis under the session; signed-in users keep it in cart_line_items. */
+export type CartOwner = { sessionId: string; userId?: string };
+type StoredLine = { key: string; item: CartItem; quantity: number };
+type DbOrTx = Database | Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 export class CartError extends Error {}
 
-const emptyCart = (): Cart => ({ lines: [], updatedAt: null });
-const sameLine = (a: CartLineRef, b: CartLineRef) => a.kind === b.kind && a.slug === b.slug;
+const ownerOf = (session: Session): CartOwner => ({ sessionId: session.id, userId: session.data.userId });
 
-export function isCartLineRef(value: unknown): value is CartLineRef {
-  if (typeof value !== "object" || value === null) return false;
-  const { kind, slug } = value as Record<string, unknown>;
-  return kind === "dish" && typeof slug === "string" && slug.length <= 80 && SLUG_PATTERN.test(slug);
+export async function currentCartOwner(): Promise<CartOwner | null> {
+  const session = await getSession();
+  return session ? ownerOf(session) : null;
 }
 
-export async function getCart(sessionId: string): Promise<Cart> {
+/** Server Functions and Route Handlers only (may set the session cookie). */
+export async function ensureCartOwner(): Promise<CartOwner> {
+  return ownerOf(await ensureSession());
+}
+
+function parseStored(lines: { item: unknown; quantity: unknown }[]): StoredLine[] {
+  const parsed: StoredLine[] = [];
+  for (const line of lines) {
+    const item = parseCartItem(line.item);
+    const quantity = Number(line.quantity);
+    if (!item || !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_LINE_QUANTITY) continue;
+    parsed.push({ key: lineKey(item), item, quantity });
+  }
+  return parsed;
+}
+
+async function readGuestLines(sessionId: string): Promise<StoredLine[]> {
   const raw = await getRedis().get(cartKey(sessionId));
-  if (!raw) return emptyCart();
+  if (!raw) return [];
   try {
-    return JSON.parse(raw) as Cart;
+    const data = JSON.parse(raw) as { lines?: unknown };
+    return Array.isArray(data.lines) ? parseStored(data.lines) : [];
   } catch {
-    return emptyCart();
+    return [];
   }
 }
 
-async function saveCart(sessionId: string, cart: Cart) {
+async function writeGuestLines(sessionId: string, lines: StoredLine[]) {
   const redis = getRedis();
-  if (cart.lines.length === 0) {
+  if (lines.length === 0) {
     await redis.del(cartKey(sessionId));
     return;
   }
-  await redis.set(cartKey(sessionId), JSON.stringify(cart), "EX", sessionTtlSeconds());
+  const payload = { lines: lines.map(({ item, quantity }) => ({ item, quantity })), updatedAt: Date.now() };
+  await redis.set(cartKey(sessionId), JSON.stringify(payload), "EX", sessionTtlSeconds());
 }
 
-/** Sets the quantity for one line; 0 removes it. Prices are never stored here and are resolved at checkout. */
-export async function setCartLineQuantity(sessionId: string, ref: CartLineRef, quantity: number): Promise<Cart> {
-  if (!Number.isInteger(quantity) || quantity < 0 || quantity > MAX_LINE_QUANTITY) {
-    throw new CartError(`La cantidad debe estar entre 0 y ${MAX_LINE_QUANTITY}.`);
+async function readUserLines(userId: string): Promise<StoredLine[]> {
+  const rows = await getDb()
+    .select({ item: schema.cartLineItems.item, quantity: schema.cartLineItems.quantity })
+    .from(schema.cartLineItems)
+    .where(eq(schema.cartLineItems.userId, userId))
+    .orderBy(schema.cartLineItems.createdAt);
+  return parseStored(rows);
+}
+
+export async function readCartLines(owner: CartOwner): Promise<StoredLine[]> {
+  return owner.userId ? readUserLines(owner.userId) : readGuestLines(owner.sessionId);
+}
+
+/** Lines priced against the live catalog. Lines whose products were retired are dropped. */
+export async function getPricedCart(owner: CartOwner | null): Promise<ResolvedLine[]> {
+  if (!owner) return [];
+  const [catalog, lines] = await Promise.all([getCatalog(), readCartLines(owner)]);
+  return lines.flatMap((line) => resolveLine(catalog, line.item, line.quantity) ?? []);
+}
+
+const sourceOf = (item: CartItem) => (item.kind === "package" ? "package" : item.source);
+
+async function upsertUserLine(db: DbOrTx, userId: string, item: CartItem, quantity: number, mode: "set" | "add") {
+  const key = lineKey(item);
+  if (mode === "set" && quantity === 0) {
+    await db
+      .delete(schema.cartLineItems)
+      .where(and(eq(schema.cartLineItems.userId, userId), eq(schema.cartLineItems.lineKey, key)));
+    return;
   }
 
-  const cart = await getCart(sessionId);
-  const others = cart.lines.filter((line) => !sameLine(line, ref));
-  const existing = cart.lines.find((line) => sameLine(line, ref));
+  const [existing] = await db
+    .select({ quantity: schema.cartLineItems.quantity })
+    .from(schema.cartLineItems)
+    .where(and(eq(schema.cartLineItems.userId, userId), eq(schema.cartLineItems.lineKey, key)));
+  if (!existing) {
+    const [{ value }] = await db
+      .select({ value: count() })
+      .from(schema.cartLineItems)
+      .where(eq(schema.cartLineItems.userId, userId));
+    if (value >= MAX_CART_LINES) throw new CartError("Tu carrito ya tiene demasiados productos.");
+  }
 
-  if (quantity === 0) {
-    cart.lines = others;
-  } else if (existing) {
-    existing.quantity = quantity;
+  await db
+    .insert(schema.cartLineItems)
+    .values({ userId, lineKey: key, source: sourceOf(item), item, quantity })
+    .onConflictDoUpdate({
+      target: [schema.cartLineItems.userId, schema.cartLineItems.lineKey],
+      set: {
+        item: sql`excluded.item`,
+        quantity:
+          mode === "add"
+            ? sql`least(${MAX_LINE_QUANTITY}, ${schema.cartLineItems.quantity} + excluded.quantity)`
+            : sql`excluded.quantity`,
+        updatedAt: new Date(),
+      },
+    });
+}
+
+function applyToGuest(lines: StoredLine[], item: CartItem, quantity: number, mode: "set" | "add"): StoredLine[] {
+  const key = lineKey(item);
+  const existing = lines.find((line) => line.key === key);
+  const next = Math.min(MAX_LINE_QUANTITY, mode === "add" ? (existing?.quantity ?? 0) + quantity : quantity);
+  if (next === 0) return lines.filter((line) => line.key !== key);
+  if (existing) return lines.map((line) => (line.key === key ? { ...line, item, quantity: next } : line));
+  if (lines.length >= MAX_CART_LINES) throw new CartError("Tu carrito ya tiene demasiados productos.");
+  return [...lines, { key, item, quantity: next }];
+}
+
+export async function changeCartLine(owner: CartOwner, item: CartItem, quantity: number, mode: "set" | "add") {
+  const min = mode === "add" ? 1 : 0;
+  if (!Number.isInteger(quantity) || quantity < min || quantity > MAX_LINE_QUANTITY) {
+    throw new CartError(`La cantidad debe estar entre ${min} y ${MAX_LINE_QUANTITY}.`);
+  }
+  if (quantity > 0 && !resolveLine(await getCatalog(), item, 1)) {
+    throw new CartError("Esta combinación no está disponible.");
+  }
+
+  if (owner.userId) {
+    await upsertUserLine(getDb(), owner.userId, item, quantity, mode);
   } else {
-    if (cart.lines.length >= MAX_CART_LINES) throw new CartError("Tu carrito ya tiene demasiados productos.");
-    cart.lines.push({ kind: ref.kind, slug: ref.slug, quantity });
+    await writeGuestLines(owner.sessionId, applyToGuest(await readGuestLines(owner.sessionId), item, quantity, mode));
   }
-
-  cart.updatedAt = Date.now();
-  await saveCart(sessionId, cart);
-  return cart.lines.length === 0 ? emptyCart() : cart;
 }
 
-export async function clearCart(sessionId: string) {
+export async function addCartItems(owner: CartOwner, items: { item: CartItem; quantity: number }[]) {
+  if (owner.userId) {
+    const userId = owner.userId;
+    await getDb().transaction(async (tx) => {
+      for (const { item, quantity } of items) await upsertUserLine(tx, userId, item, quantity, "add");
+    });
+    return;
+  }
+  let lines = await readGuestLines(owner.sessionId);
+  for (const { item, quantity } of items) lines = applyToGuest(lines, item, quantity, "add");
+  await writeGuestLines(owner.sessionId, lines);
+}
+
+/**
+ * Moves the guest cart into cart_line_items after login, register, or account link, merging identical
+ * lines, then deletes the Redis key.
+ */
+export async function migrateGuestCartToUser(sessionId: string, userId: string) {
+  const lines = await readGuestLines(sessionId);
+  if (lines.length > 0) {
+    await getDb().transaction(async (tx) => {
+      for (const line of lines) {
+        try {
+          await upsertUserLine(tx, userId, line.item, line.quantity, "add");
+        } catch (error) {
+          if (!(error instanceof CartError)) throw error;
+        }
+      }
+    });
+  }
+  await getRedis().del(cartKey(sessionId));
+}
+
+export async function clearUserCart(db: DbOrTx, userId: string) {
+  await db.delete(schema.cartLineItems).where(eq(schema.cartLineItems.userId, userId));
+}
+
+export async function clearGuestCart(sessionId: string) {
   await getRedis().del(cartKey(sessionId));
 }

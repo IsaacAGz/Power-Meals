@@ -8,6 +8,20 @@
       "when": 1792093347906,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792134682446,
+      "tag": "0001_catalog_builder",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792135604649,
+      "tag": "0002_webhook_outcome",
+      "breakpoints": true
     }
   ]
 }

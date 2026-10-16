@@ -3,6 +3,7 @@ import { homeFor } from "@/lib/auth/dal";
 import { verifyAgainstDummy, verifyPassword } from "@/lib/auth/password";
 import { authError, forbiddenOrigin, tooManyAttempts, type AuthResponse } from "@/lib/auth/responses";
 import { parseLogin, safeNextPath } from "@/lib/auth/validation";
+import { migrateGuestCartToUser } from "@/lib/cart";
 import { getDb, schema } from "@/lib/db";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { clientIp, isSameOrigin, readJsonBody } from "@/lib/request";
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
   const valid = user ? await verifyPassword(user.passwordHash, data.password) : await verifyAgainstDummy(data.password);
   if (!user || !valid) return authError(401, { message: "Correo o contraseña incorrectos." });
 
-  await rotateSession({ userId: user.id });
+  const session = await rotateSession({ userId: user.id });
+  await migrateGuestCartToUser(session.id, user.id);
   return Response.json({ ok: true, redirectTo: safeNextPath(body.next, homeFor(user)) } satisfies AuthResponse);
 }

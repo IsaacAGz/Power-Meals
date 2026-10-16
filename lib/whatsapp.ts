@@ -1,4 +1,4 @@
-import { formatMXN } from "./menu-data";
+import { formatMXN } from "./format";
 
 export const WHATSAPP_NUMBER = "16196001137";
 export const WHATSAPP_DISPLAY = "+1 619 600 1137";

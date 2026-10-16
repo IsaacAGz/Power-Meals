@@ -1,16 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { connection } from "next/server";
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { MenuBrowser } from "@/components/MenuBrowser";
+import { PackageCards } from "@/components/PackageCards";
 import { Reveal } from "@/components/Reveal";
+import { getCatalog } from "@/lib/catalog";
+import { menuCards } from "@/lib/catalog/menu";
 import { buttonPrimary, container } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "Menú y precios",
-  description: "Platillos de meal prep altos en proteína, balanceados, ligeros y desayunos. Precios por porción en MXN.",
+  description:
+    "Platillos de meal prep en Regular y Plus, paquetes POWER Chicken y POWER Mix. Arma tu platillo y paga en línea. Precios en MXN.",
 };
 
-export default function MenuPage() {
+export default async function MenuPage() {
+  await connection();
+  const catalog = await getCatalog();
+
   return (
     <>
       <section className="pt-12 pb-24 md:pt-20 md:pb-32">
@@ -21,22 +29,37 @@ export default function MenuPage() {
             </h1>
           </Reveal>
           <Reveal onMount delay={0.08}>
-            <p className="mt-6 max-w-[52ch] text-lg leading-relaxed text-muted">
-              Precios por porción en MXN. Elige tus platillos y confirma tu pedido por WhatsApp.
+            <p className="mt-6 max-w-[56ch] text-lg leading-relaxed text-muted">
+              Cada platillo viene en Regular o Plus, balanceado con vegetales o con doble carb. Precios por porción en MXN,
+              con 1 oz de salsa roja o verde incluida.
             </p>
           </Reveal>
           <div className="mt-12">
-            <MenuBrowser />
+            <MenuBrowser items={menuCards(catalog)} filters={catalog.filters} />
           </div>
         </div>
       </section>
 
+      {catalog.packages.length > 0 && (
+        <section id="paquetes" className="border-t border-line bg-cream py-20 md:py-24">
+          <div className={container}>
+            <h2 className="font-display text-4xl font-extrabold tracking-tight md:text-5xl">Paquetes para la semana</h2>
+            <p className="mt-3 max-w-[52ch] text-[16px] leading-relaxed text-muted">
+              6, 10 o 15 comidas a mejor precio. Eliges la base y el estilo de cada una.
+            </p>
+            <div className="mt-10">
+              <PackageCards packages={catalog.packages} />
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="border-t border-line bg-paper py-20 md:py-24">
         <div className={`${container} flex flex-col items-start justify-between gap-8 md:flex-row md:items-center`}>
           <div>
-            <h2 className="font-display text-3xl font-extrabold tracking-tight md:text-4xl">¿Pedido para toda la semana?</h2>
+            <h2 className="font-display text-3xl font-extrabold tracking-tight md:text-4xl">Arma tu propio platillo</h2>
             <p className="mt-3 max-w-[50ch] text-[16px] leading-relaxed text-muted">
-              Combina platillos en un solo pedido. Pagas por transferencia al confirmar.
+              Elige proteína, base, tamaño y estilo. Pagas con tarjeta en Openpay o por WhatsApp.
             </p>
           </div>
           <Link href="/pedido" className={buttonPrimary}>

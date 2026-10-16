@@ -43,7 +43,7 @@ export function Footer() {
 
       <div className="border-t border-line">
         <p className={`${container} py-6 text-[13px] text-muted`}>
-          © {year} Power Meals. Precios en MXN. Pagos por transferencia bancaria, confirmados por WhatsApp.
+          © {year} Power Meals. Precios en MXN. Pago con tarjeta en Openpay o por transferencia vía WhatsApp.
         </p>
       </div>
     </footer>

@@ -10,12 +10,15 @@ Related: [power-meals-v2.md](./power-meals-v2.md) (engineering brief), [power-me
 - [x] **Phase 1:** Redis sessions, Argon2id + pepper, auth rate limits, `/cuenta` `/historial`, kitchen role
   - [x] 24h sliding TTL on `session:*` and `cart:session:*`; `REDIS_SESSION_TTL_SECONDS=86400`
   - [x] Guest cart in Redis; `lib/cart/` helpers for touch + migration prep
-- [ ] **Phase 2:** DB-backed catalog/cart, Openpay checkout + webhook, guest post-payment account linking
-  - [ ] **Catalog migration (see [Catalog and ordering model](#catalog-and-ordering-model)):** meal builder + templates + packages; retail categories (4 filters); seed from Sistema Maestro xlsx—not inventory ingredients
-  - [ ] **Packages UI:** POWER Chicken / POWER Mix on [`app/page.tsx`](./app/page.tsx) (home) and [`app/menu/page.tsx`](./app/menu/page.tsx)
-  - [ ] **Pedido UX:** build-your-own plate, template quick-picks, reorder from past orders (logged-in)
-  - [ ] Strict webhook idempotency + `openpay_webhook_events`; no duplicate SQS on replay
-  - [ ] Migrate guest cart → cart on login/link; clear cart on first paid webhook
+- [ ] **Phase 2:** DB-backed catalog/cart, Openpay checkout + webhook, guest post-payment account linking (code complete; needs a real Openpay sandbox payment, see [Phase 2 status](#phase-2--catalog-cart-and-openpay-checkout))
+  - [x] **Catalog migration (see [Catalog and ordering model](#catalog-and-ordering-model)):** meal builder + templates + packages; retail categories (4 filters); seed from Sistema Maestro xlsx—not inventory ingredients
+  - [x] **Packages UI:** POWER Chicken / POWER Mix on [`app/page.tsx`](./app/page.tsx) (home) and [`app/menu/page.tsx`](./app/menu/page.tsx)
+  - [x] **Pedido UX:** build-your-own plate, template quick-picks, reorder from past orders (logged-in)
+  - [x] Strict webhook idempotency + `openpay_webhook_events`; no duplicate SQS on replay (the SQS publish itself lands in Phase 3 behind the same first-success gate)
+  - [x] `public_order_ref` + Openpay redirect URL with `order_ref` (Openpay takes one URL; cancel is reached from it)
+  - [x] Sessionless `/pedido/success` + `/pedido/cancel` + public status polling API
+  - [x] Post-payment **“Crea una cuenta para guardar este pedido”** + attach order to user
+  - [x] Migrate guest cart → cart on login/link; clear cart on first paid webhook
 - [ ] **Phase 3:** Single SQS queue + `kitchen_facility_id` attributes, print-daemon filter per LAN facility
   - [ ] Print failures: no delete, `ChangeMessageVisibility` backoff (60–300s), non-blocking poll loop
 - [ ] **Phase 4:** `/kitchen/dashboard` with 10s polling, facility-scoped orders and status lifecycle
@@ -72,7 +75,8 @@ flowchart LR
 | Payments | **Openpay** hosted flow; no PAN/CVV on EC2; store charge id, status, amounts only |
 | Checkout identity | **Guest checkout**; post-payment **“create account to save this order”** (email + password) linking `orders.guest_email` / session to `users.id` |
 | Print path | **One daemon per kitchen facility** on a local PC; polls **shared** SQS queue, filters by `kitchen_facility_id` attribute, prints ESC/POS |
-| Sessions | Redis cookie session id; `HttpOnly`, `Secure`, `SameSite=Strict` |
+| Sessions | Redis cookie session id; `HttpOnly`, `Secure`, `SameSite=Strict` (intentional for CSRF; Openpay return uses [public `order_ref`](#openpay-redirect-return-samesitestrict), not session on first paint) |
+| Openpay return | **`SameSite=Strict` unchanged**; success/cancel pages load by query param **`order_ref`** (`orders.public_order_ref`); **never** require session cookie on first paint after redirect from Openpay |
 | Passwords | Argon2id + per-user salt + env **pepper** |
 | Hosting | EC2 Node (`next start`); **systemd** unit for app; Nginx reverse proxy; CloudFront for static edge cache |
 | Data layer | **Drizzle ORM** + versioned migrations in repo (`drizzle/`); optional `schema.sql` snapshot for ops |
@@ -145,7 +149,8 @@ Phase 0 shipped a simplified **`categories` + `dishes`** model for bootstrap see
 
 | Table | Role |
 |-------|------|
-| `kitchen_facilities`, zones, pickup, orders, payments, webhooks | Unchanged |
+| `kitchen_facilities`, zones, pickup, payments, webhooks | Unchanged |
+| `orders` | Add **`public_order_ref`** (unique, set at checkout); used for sessionless Openpay return |
 | `order_items` | **Replace or supersede** with **`order_line_items`** that snapshot builder output (see below) |
 
 **New or repurposed catalog tables**
@@ -311,10 +316,92 @@ sequenceDiagram
 | `raw_payload` (jsonb, redacted) or `payload_hash` | Audit |
 | `processed_at` | Timestamp |
 | `is_duplicate` | Boolean for replay logging |
+| `outcome` | `paid`, `failed`, `duplicate`, `ignored`, `unknown_order`, `amount_mismatch` (Phase 2) |
 
-Unique indexes on `openpay_event_id` and/or `openpay_transaction_id` where applicable.
+Unique index on (`openpay_transaction_id`, `event_type`) where `outcome` is `paid` or `failed`: at most one event per charge changes the order, while ignored or replayed events are still logged.
 
 **Phase 5 toggle checklist:** swap merchant id + private key, set `OPENPAY_SANDBOX_MODE=false`, confirm dashboard webhook URL points at production domain, smoke-test redirect + webhook + order row update before disabling sandbox keys.
+
+### Openpay redirect return (SameSite=Strict)
+
+**Why:** The customer returns from Openpay via a **top-level cross-site navigation**. With `SameSite=Strict` on `pm_session`, the session cookie is **not** sent on that first request. The success and cancel pages must load the receipt from PostgreSQL using a **public order reference** in the URL—not `getSession()`, `requireUser()`, or any assumption that Redis session state survived the redirect.
+
+**1. Secure reference generation (checkout handler)**
+
+When creating the Openpay redirect charge:
+
+- On `orders` insert (`status = pending_payment`), generate **`public_order_ref`**: cryptographically random, URL-safe (e.g. 32 bytes → base64url), stored on **`orders.public_order_ref`** with a **unique** index (Phase 2 migration alongside catalog changes).
+- Pass the same value to Openpay as the charge **order_id** / merchant reference where supported, so webhook resolution stays aligned with the redirect URL.
+- Do **not** put sequential `order_number` or internal UUID alone in customer-facing URLs without the dedicated token column.
+
+**2. Openpay redirect URLs**
+
+Configure on the redirect charge (base from `NEXT_PUBLIC_SITE_URL`; production `https://powermeals.mx`):
+
+| Outcome | URL |
+|---------|-----|
+| Success | `{NEXT_PUBLIC_SITE_URL}/pedido/success?order_ref={public_order_ref}` |
+| Cancel / failure | `{NEXT_PUBLIC_SITE_URL}/pedido/cancel?order_ref={public_order_ref}` |
+
+Document `NEXT_PUBLIC_SITE_URL` in [`.env.example`](./.env.example).
+
+**3. Public success page** — [`app/pedido/success/page.tsx`](./app/pedido/success/page.tsx)
+
+- Read **`order_ref`** from `searchParams` (Next 16: async `searchParams` on the page).
+- Load order + line items from PostgreSQL by **`public_order_ref` only** (queries in `lib/orders/`, e.g. `public-receipt.ts`—DTO safe for a sessionless page).
+- **No session required** to render; missing or unknown `order_ref` → generic not-found (“Pedido no encontrado”).
+- **Payment truth:** the redirect alone does **not** set `paid`; only the webhook does ([Webhook idempotency (strict)](#webhook-idempotency-strict)). UI behavior:
+  - **`pending_payment`** — Spanish copy such as “Verificando tu pago…” plus client polling **`GET /api/orders/public-status?order_ref=`** ([`app/api/orders/public-status/route.ts`](./app/api/orders/public-status/route.ts)) every 2–3s, max ~60s; response is minimal: `{ status, paidAt? }` (no extra PII).
+  - **`paid` / `confirmed`** — full receipt: line items, totals, fulfillment summary, `order_number`.
+  - **Still pending after timeout** — explain that confirmation may arrive by email; webhook can land later.
+- Rate-limit public status and receipt lookups by IP ([`lib/rate-limit.ts`](./lib/rate-limit.ts)).
+
+**Cancel page** — [`app/pedido/cancel/page.tsx`](./app/pedido/cancel/page.tsx): same lookup by `order_ref`; show payment not completed and a retry CTA back to checkout.
+
+**4. Post-payment account linking**
+
+Below the receipt when status is **`paid` / `confirmed`** and **`orders.user_id` IS NULL**:
+
+- Section: **“Crea una cuenta para guardar este pedido”** with **`customer_email` pre-filled** from the order row (default: read-only display; field editable only if product requires it).
+- **Register** — extend flow with **`POST /api/auth/link-order`** (or server action): after successful register/login, set `orders.user_id` when `order_ref` matches, order is still guest-owned, and guardrails pass (same-origin; optional one-time Redis key `link:order:{public_order_ref}` issued when rendering success, TTL 24h, to block arbitrary order hijack).
+- **Already have an account?** — link to `/ingresar?next=/pedido/success?order_ref=…`; on login, **attach order** if `user_id` is still null and authenticated email matches `customer_email` (or explicit confirm step).
+- After link: CTA to `/historial`; run **`migrateGuestCartToUser`** if a session exists post-login.
+- **Logged-in checkout** (`user_id` set at order creation): hide the link section; receipt still loads via `order_ref` without session on return; `pm_session` applies again on the next same-site request.
+
+**Schema (Phase 2 migration):**
+
+```text
+orders.public_order_ref  text NOT NULL UNIQUE   -- set at order creation, never rotated
+```
+
+**Edge cache:** When implementing, add `/pedido/success*`, `/pedido/cancel*`, and `/api/orders/public-status*` to **CachingDisabled** in CloudFront (see [docs/ec2-setup.md](./docs/ec2-setup.md) behaviors table).
+
+```mermaid
+sequenceDiagram
+  participant Browser
+  participant Checkout as CheckoutHandler
+  participant Openpay
+  participant Success as pedido_success
+  participant API as public_status_API
+  participant Webhook as webhooks_openpay
+  participant PG as PostgreSQL
+  Browser->>Checkout: Pagar con Openpay
+  Checkout->>PG: insert order plus public_order_ref
+  Checkout->>Openpay: redirect charge success URL with order_ref
+  Openpay->>Browser: redirect cross_site
+  Note over Browser: pm_session not sent Strict
+  Browser->>Success: GET success order_ref
+  Success->>PG: load by public_order_ref
+  alt status pending_payment
+    Success->>Browser: verifying UI
+    loop poll
+      Browser->>API: public status
+      API->>PG: read status
+    end
+  end
+  Webhook->>PG: first success paid
+  Browser->>Success: receipt plus link account CTA
+```
 
 ## Session and cart memory (Redis + PostgreSQL)
 
@@ -384,7 +471,8 @@ Implement migration in `lib/cart/` (called from auth and account-link flows in P
 - Pages: `/ingresar`, `/registro`, `/cuenta`, `/historial`, `/kitchen/dashboard` (placeholder for Phase 4). Marketing pages stay static; the header always links to `/cuenta`.
 - Cart: [`lib/cart/`](./lib/cart/index.ts) + `GET`/`PUT /api/cart`, lines typed `{ kind: "dish", slug, quantity }` so Phase 2 can add builder/template/package kinds. The order form does not use it yet.
 - Staff: `npm run user:create-staff` (see [`docs/ec2-setup.md`](./docs/ec2-setup.md)).
-- Deferred to Phase 2: `migrateGuestCartToUser` (needs `cart_line_items`). Before Phase 2 checkout: `SameSite=Strict` means the cookie is **not sent** on the top-level redirect back from Openpay, so the return page must not depend on the session (look the order up by its id/token instead), or relax to `Lax`.
+- Deferred to Phase 2: `migrateGuestCartToUser` (needs `cart_line_items`).
+- **Resolved in Phase 2:** Openpay return uses **`public_order_ref`** / query param **`order_ref`**; [`app/pedido/success/page.tsx`](./app/pedido/success/page.tsx) is sessionless on load; **`SameSite=Strict` retained** (see [Openpay redirect return](#openpay-redirect-return-samesitestrict)).
 
 ---
 
@@ -394,7 +482,8 @@ Implement migration in `lib/cart/` (called from auth and account-link flows in P
 
 **Work:**
 
-- **Schema:** Apply [Phase 2 catalog migration](#database-changes-phase-2-catalog-migration) (`proteins`, `carb_bases`, `meal_templates`, `meal_packages`, `catalog_filters`, `cart_line_items`, `order_line_items`); seed from Sistema Maestro xlsx; deprecate placeholder `dishes` / legacy category tabs.
+- **Schema:** Apply [Phase 2 catalog migration](#database-changes-phase-2-catalog-migration) (`orders.public_order_ref`, `proteins`, `carb_bases`, `meal_templates`, `meal_packages`, `catalog_filters`, `cart_line_items`, `order_line_items`); seed from Sistema Maestro xlsx; deprecate placeholder `dishes` / legacy category tabs.
+- **Openpay return:** `lib/openpay/` redirect charge sets success/cancel URLs with `order_ref`; `lib/orders/public-receipt.ts` (or similar) loads by `public_order_ref` for sessionless pages.
 - **Menu & home:** Load filters (**Alto en proteína**, **Alto en carbohidrato**, **Bajo en calorías**, **Vegetariano**), templates, and **package cards** from DB on [`app/menu/page.tsx`](./app/menu/page.tsx) and home ([`app/page.tsx`](./app/page.tsx)).
 - **Pedido:** Meal **builder** (protein + base + Regular/Plus + Balanced/Double carb); **template** chips; **order again** for logged-in users; **package** flow with deep links `?paquete=`, `?plantilla=`, plus existing `?zona=`, `?punto=`.
 - Refactor ubicaciones/pedido fulfillment fields from DB where applicable.
@@ -405,13 +494,29 @@ Implement migration in `lib/cart/` (called from auth and account-link flows in P
   - **Secondary control:** link-style button **“¿Prefieres pagar por WhatsApp?”** → existing [`buildWhatsAppUrl`](./lib/whatsapp.ts) / popup-blocked fallback UX; does **not** create a paid `orders` row unless you later add manual order ingestion.
 - Checkout flow (Openpay path):
   1. Collect guest contact (name, phone, email for receipt/link) + fulfillment fields (reuse validation from current form).
-  2. Create `orders` row `status = pending_payment`, **`order_line_items`** (builder snapshots + package lines), set `kitchen_facility_id` from zone/pickup FK.
-  3. Create Openpay **redirect** charge using sandbox or prod base URL from `OPENPAY_SANDBOX_MODE`; customer returns to success/cancel URLs on EC2.
+  2. Create `orders` row `status = pending_payment`, assign **`public_order_ref`**, **`order_line_items`** (builder snapshots + package lines), set `kitchen_facility_id` from zone/pickup FK.
+  3. Create Openpay **redirect** charge (sandbox or prod base URL from `OPENPAY_SANDBOX_MODE`) with success URL `/pedido/success?order_ref={public_order_ref}` and cancel URL `/pedido/cancel?order_ref={public_order_ref}`.
   4. **Webhook** `POST /api/webhooks/openpay`: implement **strict idempotency** (see **Webhook idempotency (strict)**)—`charge.succeeded` only drives paid status, SQS, and cart clear on first success.
-  5. Success page: order summary + **“Crear cuenta”** pre-filled email → link order to new user (one-time token in Redis or signed link); account link also runs cart migration if a guest cart remains.
+  5. **Return UX (sessionless):** [`app/pedido/success/page.tsx`](./app/pedido/success/page.tsx) + [`app/pedido/cancel/page.tsx`](./app/pedido/cancel/page.tsx) load by `order_ref`; poll **`GET /api/orders/public-status`** while `pending_payment` (see [Openpay redirect return](#openpay-redirect-return-samesitestrict)).
+  6. **Account link:** **“Crea una cuenta para guardar este pedido”** with email pre-filled → **`POST /api/auth/link-order`** (or equivalent) attaches guest order to new or existing user; cart migration if session exists after login.
 - Logging: structured logs without card data; webhook replay protection via `openpay_webhook_events` + order status gate.
 
-**Exit criteria:** End-to-end sandbox payment creates paid order with resolved meal lines; guest can link account; order appears in `/historial` with reorder; packages visible on home and `/menu`; builder + templates work; replaying the same webhook twice yields one SQS publish and second response **200 OK** with duplicate audit log; login preserves cart via `cart_line_items`; paid webhook clears cart for the user.
+**Exit criteria:** End-to-end sandbox payment creates paid order with resolved meal lines; guest lands on **`/pedido/success?order_ref=…` without `pm_session`**, sees verifying → paid receipt; can register via **“Crea una cuenta…”** and see the order in `/historial`; packages visible on home and `/menu`; builder + templates work; replaying the same webhook twice yields one SQS publish and second response **200 OK** with duplicate audit log; login preserves cart via `cart_line_items`; paid webhook clears cart for the user.
+
+**Status:** Code complete. Verified with `next build && next start` against local Postgres + Redis and a mocked Openpay API; a real sandbox payment is still required for the exit criteria.
+
+- Schema: [`drizzle/0001_catalog_builder.sql`](./drizzle/0001_catalog_builder.sql) adds the catalog tables, `cart_line_items`, `order_line_items` (a package is a header row plus one slot row per meal) and `orders.public_order_ref` (backfilled for existing rows). It drops `categories`, `dishes`, `order_items` and `cart_lines`. [`drizzle/0002_webhook_outcome.sql`](./drizzle/0002_webhook_outcome.sql) adds `openpay_webhook_events.outcome`.
+- Catalog: seeded from [`lib/catalog/seed-data.ts`](./lib/catalog/seed-data.ts): 7 proteins, 5 bases, 19 templates, 12 packages. Prices are recomputed server-side by [`lib/catalog/pricing.ts`](./lib/catalog/pricing.ts), which the builder also uses for previews.
+- Checkout: `POST /api/checkout` reads the cart server-side, creates the pending order, then the Openpay redirect charge (`confirm: false`). If Openpay fails, the order is cancelled and the customer is offered WhatsApp.
+- Webhook: `POST /api/webhooks/openpay` requires basic auth and re-fetches the charge from the Openpay API (webhooks are unsigned). Each event is logged with an `outcome`. The unique index only covers `paid` / `failed`, so an early event that arrives while the charge is still pending can't block the real success. The order row lock + status gate decides first success; replays are logged as `duplicate`.
+- Account link: the success page issues a one-time token (Redis, 24h) only for a paid guest order. Linking requires a session whose email matches the order email.
+- Deviations from the plan above:
+  - Openpay accepts a single `redirect_url`. A failed or cancelled charge sends `/pedido/success` to `/pedido/cancel`.
+  - The **Vegetariano** filter exists but has no templates yet.
+  - POWER Mix slots pay the protein's upgrade (`premiumSurcharge`). POWER Chicken slots are chicken only. Confirm with ops.
+  - Template filter tags and placeholder images (one per protein) need ops review.
+  - `/ubicaciones` still reads the static location data; `/pedido` reads zones and points from the DB.
+  - No confirmation email is sent.
 
 ---
 
@@ -489,15 +594,19 @@ Implement migration in `lib/cart/` (called from auth and account-link flows in P
 app/
   (marketing pages — existing)
   pedido/          # checkout (server + client islands)
+  pedido/success/  # sessionless receipt; order_ref query param
+  pedido/cancel/   # payment cancelled / failed
   cuenta/
   historial/
   kitchen/dashboard/
   api/
     health/
     webhooks/openpay/
-    auth/          # if using route handlers vs only server actions
+    orders/public-status/  # sessionless poll while webhook pending
+    auth/          # register, login, logout, link-order
 lib/
   db/              # Drizzle client, schema.ts, queries
+  orders/          # public receipt by public_order_ref
   session/
   cart/            # Redis guest cart, cart_line_items access, migration
   openpay/

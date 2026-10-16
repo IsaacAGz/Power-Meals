@@ -1,10 +1,20 @@
 // Nginx sets X-Real-IP from the connection (or from CloudFront via set_real_ip_from), so it is trusted here.
 // The app listens on 127.0.0.1 only; nothing else can reach it to forge these headers.
 export function clientIp(request: Request): string {
-  const realIp = request.headers.get("x-real-ip")?.trim();
+  return clientIpFromHeaders(request.headers);
+}
+
+export function clientIpFromHeaders(headers: Headers): string {
+  const realIp = headers.get("x-real-ip")?.trim();
   if (realIp) return realIp;
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   return forwarded || "unknown";
+}
+
+export function siteUrl(): string {
+  const value = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!value) throw new Error("Missing required environment variable NEXT_PUBLIC_SITE_URL");
+  return value.replace(/\/+$/, "");
 }
 
 /** Route Handlers don't get the Origin check that Server Actions do, so state-changing handlers call this. */

@@ -1,6 +1,6 @@
-import { sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
-import { categories as staticCategories, dishes as staticDishes } from "../menu-data";
+import { baseSeed, filterSeed, packageSeed, portionSeed, proteinSeed, templateSeed } from "../catalog/seed-data";
 import { pickupPoints as staticPickupPoints, zones as staticZones } from "../locations-data";
 import * as schema from "./schema";
 
@@ -77,41 +77,7 @@ export async function seed(db: SeedDatabase) {
       .returning({ id: schema.kitchenFacilities.id, slug: schema.kitchenFacilities.slug });
     const facilityId = new Map(facilities.map((row) => [row.slug, row.id]));
 
-    const categoryRows = await tx
-      .insert(schema.categories)
-      .values(staticCategories.map((category, index) => ({ slug: category.id, label: category.label, sortOrder: index })))
-      .onConflictDoUpdate({
-        target: schema.categories.slug,
-        set: { label: sql`excluded.label`, sortOrder: sql`excluded.sort_order` },
-      })
-      .returning({ id: schema.categories.id, slug: schema.categories.slug });
-    const categoryId = new Map(categoryRows.map((row) => [row.slug, row.id]));
-
-    const dishRows = await tx
-      .insert(schema.dishes)
-      .values(
-        staticDishes.map((dish, index) => ({
-          slug: dish.slug,
-          categoryId: categoryId.get(dish.category)!,
-          name: dish.name,
-          description: dish.description,
-          priceCents: Math.round(dish.price * 100),
-          imageUrl: dish.image,
-          sortOrder: index,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: schema.dishes.slug,
-        set: {
-          categoryId: sql`excluded.category_id`,
-          name: sql`excluded.name`,
-          description: sql`excluded.description`,
-          priceCents: sql`excluded.price_cents`,
-          imageUrl: sql`excluded.image_url`,
-          sortOrder: sql`excluded.sort_order`,
-        },
-      })
-      .returning({ id: schema.dishes.id });
+    const catalog = await seedCatalog(tx);
 
     const zoneRows = await tx
       .insert(schema.deliveryZones)
@@ -161,10 +127,136 @@ export async function seed(db: SeedDatabase) {
 
     return {
       kitchenFacilities: facilities.length,
-      categories: categoryRows.length,
-      dishes: dishRows.length,
+      ...catalog,
       deliveryZones: zoneRows.length,
       pickupPoints: pickupRows.length,
     };
   });
+}
+
+type SeedTx = Parameters<Parameters<SeedDatabase["transaction"]>[0]>[0];
+
+const withOrder = <T>(rows: readonly T[]) => rows.map((row, index) => ({ ...row, sortOrder: index }));
+
+async function seedCatalog(tx: SeedTx) {
+  const filterRows = await tx
+    .insert(schema.catalogFilters)
+    .values(withOrder(filterSeed))
+    .onConflictDoUpdate({
+      target: schema.catalogFilters.slug,
+      set: { label: sql`excluded.label`, sortOrder: sql`excluded.sort_order` },
+    })
+    .returning({ id: schema.catalogFilters.id, slug: schema.catalogFilters.slug });
+  const filterId = new Map(filterRows.map((row) => [row.slug, row.id]));
+
+  await tx
+    .insert(schema.portionSizes)
+    .values(withOrder(portionSeed))
+    .onConflictDoUpdate({
+      target: schema.portionSizes.size,
+      set: {
+        label: sql`excluded.label`,
+        basePriceCents: sql`excluded.base_price_cents`,
+        proteinGrams: sql`excluded.protein_grams`,
+        carbGrams: sql`excluded.carb_grams`,
+        vegGrams: sql`excluded.veg_grams`,
+        doubleCarbGrams: sql`excluded.double_carb_grams`,
+        sortOrder: sql`excluded.sort_order`,
+      },
+    });
+
+  const proteinRows = await tx
+    .insert(schema.proteins)
+    .values(withOrder(proteinSeed))
+    .onConflictDoUpdate({
+      target: schema.proteins.slug,
+      set: {
+        name: sql`excluded.name`,
+        tier: sql`excluded.tier`,
+        regularUpgradeCents: sql`excluded.regular_upgrade_cents`,
+        plusUpgradeCents: sql`excluded.plus_upgrade_cents`,
+        sortOrder: sql`excluded.sort_order`,
+      },
+    })
+    .returning({ id: schema.proteins.id, slug: schema.proteins.slug });
+  const proteinId = new Map(proteinRows.map((row) => [row.slug, row.id]));
+
+  const baseRows = await tx
+    .insert(schema.carbBases)
+    .values(withOrder(baseSeed))
+    .onConflictDoUpdate({
+      target: schema.carbBases.slug,
+      set: {
+        name: sql`excluded.name`,
+        hasCarbPortion: sql`excluded.has_carb_portion`,
+        includesVeggies: sql`excluded.includes_veggies`,
+        allowsDoubleCarb: sql`excluded.allows_double_carb`,
+        sortOrder: sql`excluded.sort_order`,
+      },
+    })
+    .returning({ id: schema.carbBases.id, slug: schema.carbBases.slug });
+  const baseId = new Map(baseRows.map((row) => [row.slug, row.id]));
+
+  const templateRows = await tx
+    .insert(schema.mealTemplates)
+    .values(
+      templateSeed.map((template, index) => ({
+        slug: template.slug,
+        name: template.name,
+        description: template.description,
+        proteinId: proteinId.get(template.protein)!,
+        carbBaseId: baseId.get(template.base)!,
+        imageUrl: template.imageUrl,
+        skuRegular: template.skuRegular,
+        skuPlus: template.skuPlus,
+        sortOrder: index,
+      })),
+    )
+    .onConflictDoUpdate({
+      target: schema.mealTemplates.slug,
+      set: {
+        name: sql`excluded.name`,
+        description: sql`excluded.description`,
+        proteinId: sql`excluded.protein_id`,
+        carbBaseId: sql`excluded.carb_base_id`,
+        imageUrl: sql`excluded.image_url`,
+        skuRegular: sql`excluded.sku_regular`,
+        skuPlus: sql`excluded.sku_plus`,
+        sortOrder: sql`excluded.sort_order`,
+      },
+    })
+    .returning({ id: schema.mealTemplates.id, slug: schema.mealTemplates.slug });
+  const templateId = new Map(templateRows.map((row) => [row.slug, row.id]));
+
+  await tx.delete(schema.mealTemplateFilters).where(inArray(schema.mealTemplateFilters.templateId, [...templateId.values()]));
+  const links = templateSeed.flatMap((template) =>
+    template.filters.map((filter) => ({ templateId: templateId.get(template.slug)!, filterId: filterId.get(filter)! })),
+  );
+  if (links.length > 0) await tx.insert(schema.mealTemplateFilters).values(links);
+
+  const packageRows = await tx
+    .insert(schema.mealPackages)
+    .values(withOrder(packageSeed))
+    .onConflictDoUpdate({
+      target: schema.mealPackages.slug,
+      set: {
+        productSlug: sql`excluded.product_slug`,
+        name: sql`excluded.name`,
+        description: sql`excluded.description`,
+        mealCount: sql`excluded.meal_count`,
+        size: sql`excluded.size`,
+        priceCents: sql`excluded.price_cents`,
+        rules: sql`excluded.rules`,
+        sortOrder: sql`excluded.sort_order`,
+      },
+    })
+    .returning({ id: schema.mealPackages.id });
+
+  return {
+    catalogFilters: filterRows.length,
+    proteins: proteinRows.length,
+    carbBases: baseRows.length,
+    mealTemplates: templateRows.length,
+    mealPackages: packageRows.length,
+  };
 }

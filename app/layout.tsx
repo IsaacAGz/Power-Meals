@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     template: "%s | Power Meals",
   },
   description:
-    "Meal prep alto en proteína en Tijuana. Elige tus platillos, confirma tu pedido por WhatsApp y paga por transferencia.",
+    "Meal prep alto en proteína en Tijuana. Arma tus platillos o elige un paquete y paga con tarjeta en línea.",
   openGraph: {
     locale: "es_MX",
     siteName: "Power Meals",

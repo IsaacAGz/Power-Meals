@@ -113,7 +113,7 @@ sudo systemctl enable --now power-meals
 journalctl -u power-meals -f
 ```
 
-`db:seed` is safe to re-run: it upserts by slug and never deletes rows. Zone and pickup-point routing to kitchens can be changed directly in the database; re-seeding does not overwrite `kitchen_facility_id` on existing zones or points.
+`db:seed` is safe to re-run: it upserts by slug and never deletes rows, except that each seeded meal template's filter tags are replaced with the ones in [`lib/catalog/seed-data.ts`](../lib/catalog/seed-data.ts). Zone and pickup-point routing to kitchens can be changed directly in the database; re-seeding does not overwrite `kitchen_facility_id` on existing zones or points.
 
 ### Kitchen staff accounts
 
@@ -128,6 +128,17 @@ unset STAFF_PASSWORD
 ```
 
 Staff log in at `/ingresar` and land on `/kitchen/dashboard`, which only shows their own kitchen.
+
+### Openpay
+
+1. Set `OPENPAY_MERCHANT_ID`, `OPENPAY_PRIVATE_KEY`, `OPENPAY_SANDBOX_MODE`, `OPENPAY_WEBHOOK_USER` and `OPENPAY_WEBHOOK_PASSWORD` in `.env`, and make sure `NEXT_PUBLIC_SITE_URL=https://powermeals.mx` before building. Without the merchant ID and key, `/pedido` hides the card button and offers WhatsApp only.
+2. In the Openpay dashboard, add a webhook for `https://powermeals.mx/api/webhooks/openpay` with the same user and password (basic auth). Openpay sends a verification request first; paste the logged `verificationCode` back into the dashboard:
+
+   ```bash
+   journalctl -u power-meals | grep '"type":"verification"'
+   ```
+
+3. Subscribe at least `charge.succeeded`, `charge.failed` and `charge.cancelled`. The handler re-fetches every charge from the Openpay API and trusts only that status, so a forged body cannot mark an order paid.
 
 ## 7. Nginx
 
@@ -151,7 +162,7 @@ Returns `503` with `"degraded"` and the failing check when PostgreSQL or Redis i
 | `/_next/static/*` | CachingOptimized | Hashed filenames, immutable |
 | `/images/*`, `/maplibre/*`, `/logo.svg` | CachingOptimized | Public assets |
 | `/api/*` | CachingDisabled | Forward all headers, cookies, query strings |
-| `/kitchen/*`, `/cuenta*`, `/historial*`, `/ingresar*`, `/registro*`, `/pedido*` | CachingDisabled | Session-bound pages |
+| `/kitchen/*`, `/cuenta*`, `/historial*`, `/ingresar*`, `/registro*`, `/pedido*` | CachingDisabled | Session-bound pages; `/pedido*` also covers the Openpay return pages, which must forward the `order_ref` and `id` query strings |
 | Default (`*`) | UseOriginCacheControlHeaders | Static marketing pages send `public` headers; dynamic ones send `private, no-store` |
 
 Forward the session cookie only on the uncached behaviors so cached responses never vary by user.

@@ -1,6 +1,7 @@
 import { hashPassword } from "@/lib/auth/password";
 import { authError, forbiddenOrigin, isUniqueViolation, tooManyAttempts, type AuthResponse } from "@/lib/auth/responses";
 import { parseRegistration, safeNextPath } from "@/lib/auth/validation";
+import { migrateGuestCartToUser } from "@/lib/cart";
 import { getDb, schema } from "@/lib/db";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { clientIp, isSameOrigin, readJsonBody } from "@/lib/request";
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
     throw error;
   }
 
-  await rotateSession({ userId });
+  const session = await rotateSession({ userId });
+  await migrateGuestCartToUser(session.id, userId);
   return Response.json({ ok: true, redirectTo: safeNextPath(body.next, "/cuenta") } satisfies AuthResponse);
 }

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
+import { ReorderButton } from "@/components/order/ReorderButton";
 import { requireUser } from "@/lib/auth/dal";
 import { getDb, schema } from "@/lib/db";
-import { formatMXN } from "@/lib/menu-data";
+import { formatCents } from "@/lib/format";
+import { receiptPath } from "@/lib/orders/ref";
 import { buttonPrimary, container } from "@/lib/ui";
 
 export const metadata: Metadata = {
@@ -30,6 +32,7 @@ export default async function HistorialPage() {
     .select({
       id: schema.orders.id,
       orderNumber: schema.orders.orderNumber,
+      publicOrderRef: schema.orders.publicOrderRef,
       status: schema.orders.status,
       fulfillmentType: schema.orders.fulfillmentType,
       totalCents: schema.orders.totalCents,
@@ -61,15 +64,25 @@ export default async function HistorialPage() {
               {orders.map((order) => (
                 <li key={order.id} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-5">
                   <div>
-                    <p className="font-display text-xl font-bold tracking-tight">Pedido #{order.orderNumber}</p>
+                    <Link
+                      href={receiptPath(order.publicOrderRef)}
+                      className="font-display text-xl font-bold tracking-tight underline-offset-4 hover:underline"
+                    >
+                      Pedido #{order.orderNumber}
+                    </Link>
                     <p className="mt-1 text-sm text-muted">
                       {dateFormat.format(order.createdAt)} ·{" "}
                       {order.fulfillmentType === "delivery" ? "Entrega" : "Recolección"}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-mono text-[15px] tabular-nums">{formatMXN(order.totalCents / 100)}</p>
-                    <p className="mt-1 text-sm font-medium text-ink">{statusLabels[order.status]}</p>
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="font-mono text-[15px] tabular-nums">{formatCents(order.totalCents)}</p>
+                      <p className="mt-1 text-sm font-medium text-ink">{statusLabels[order.status]}</p>
+                    </div>
+                    {order.status !== "cancelled" && order.status !== "pending_payment" && (
+                      <ReorderButton orderId={order.id} />
+                    )}
                   </div>
                 </li>
               ))}
