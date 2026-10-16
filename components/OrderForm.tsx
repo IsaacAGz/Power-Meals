@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowCounterClockwise,
   CaretDown,
@@ -16,17 +16,13 @@ import {
 import { dishes, formatMXN, getDish } from "@/lib/menu-data";
 import { getPickupPoint, getZone, pickupPoints, zones } from "@/lib/locations-data";
 import { buildOrderMessage, buildWhatsAppUrl, orderTotal, type OrderLine } from "@/lib/whatsapp";
-import { buttonPrimary, buttonSecondary } from "@/lib/ui";
+import { buttonPrimary, buttonSecondary, inputBase, inputClass } from "@/lib/ui";
+import { FormField } from "./FormField";
 
 type Metodo = "entrega" | "recoleccion";
 type Status = "idle" | "loading" | "success" | "blocked";
 type Field = "nombre" | "telefono" | "zona" | "direccion" | "punto" | "platillos";
 type Errors = Partial<Record<Field, string>>;
-
-const inputBase =
-  "w-full rounded-control border bg-paper px-3.5 text-[15px] text-ink placeholder:text-muted transition-colors focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink";
-const inputClass = (invalid: boolean) =>
-  `${inputBase} h-12 ${invalid ? "border-[#B42318]" : "border-line-strong"}`;
 
 export function OrderForm() {
   const reduce = useReducedMotion();
@@ -404,44 +400,6 @@ function SelectShell({ children }: { children: ReactNode }) {
         aria-hidden
         className="pointer-events-none absolute top-1/2 right-3.5 size-4 -translate-y-1/2 text-ink"
       />
-    </div>
-  );
-}
-
-type FieldProps = { id: string; "aria-invalid"?: boolean; "aria-describedby"?: string };
-
-function FormField({
-  label,
-  error,
-  hint,
-  children,
-}: {
-  label: string;
-  error?: string;
-  hint?: string;
-  children: (props: FieldProps) => ReactNode;
-}) {
-  const id = useId();
-  const hintId = `${id}-hint`;
-  const errorId = `${id}-error`;
-  const describedBy = [hint && !error && hintId, error && errorId].filter(Boolean).join(" ") || undefined;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor={id} className="text-sm font-semibold text-ink">
-        {label}
-      </label>
-      {children({ id, "aria-invalid": error ? true : undefined, "aria-describedby": describedBy })}
-      {hint && !error && (
-        <p id={hintId} className="text-[13px] text-muted">
-          {hint}
-        </p>
-      )}
-      {error && (
-        <p id={errorId} className="text-[13px] font-medium text-[#B42318]">
-          {error}
-        </p>
-      )}
     </div>
   );
 }

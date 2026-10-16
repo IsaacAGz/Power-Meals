@@ -13,9 +13,11 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx --env-file-if-exists=.env scripts/seed-from-static-data.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "user:create-staff": "tsx --env-file-if-exists=.env scripts/create-staff-user.ts"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.2.2",
     "@phosphor-icons/react": "^2.1.10",
     "drizzle-orm": "^0.45.4",
     "ioredis": "^6.0.0",
@@ -24,7 +26,8 @@
     "next": "16.3.7",
     "pg": "^8.23.1",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

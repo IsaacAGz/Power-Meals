@@ -6,13 +6,16 @@ Related: [power-meals-v2.md](./power-meals-v2.md) (engineering brief), [power-me
 
 ## Implementation checklist
 
-- [ ] **Phase 0:** Drop static export, systemd + EC2/Nginx, PostgreSQL + Redis, Drizzle schema/migrate + seed from `lib/*-data.ts`
-- [ ] **Phase 1:** Redis sessions, Argon2id + pepper, auth rate limits, `/cuenta` `/historial`, kitchen role
-  - [ ] 24h sliding TTL on `session:*` and `cart:session:*`; `REDIS_SESSION_TTL_SECONDS=86400`
-  - [ ] Guest cart in Redis; `lib/cart/` helpers for touch + migration prep
+- [x] **Phase 0:** Drop static export, systemd + EC2/Nginx, PostgreSQL + Redis, Drizzle schema/migrate + seed from `lib/*-data.ts`
+- [x] **Phase 1:** Redis sessions, Argon2id + pepper, auth rate limits, `/cuenta` `/historial`, kitchen role
+  - [x] 24h sliding TTL on `session:*` and `cart:session:*`; `REDIS_SESSION_TTL_SECONDS=86400`
+  - [x] Guest cart in Redis; `lib/cart/` helpers for touch + migration prep
 - [ ] **Phase 2:** DB-backed catalog/cart, Openpay checkout + webhook, guest post-payment account linking
+  - [ ] **Catalog migration (see [Catalog and ordering model](#catalog-and-ordering-model)):** meal builder + templates + packages; retail categories (4 filters); seed from Sistema Maestro xlsx—not inventory ingredients
+  - [ ] **Packages UI:** POWER Chicken / POWER Mix on [`app/page.tsx`](./app/page.tsx) (home) and [`app/menu/page.tsx`](./app/menu/page.tsx)
+  - [ ] **Pedido UX:** build-your-own plate, template quick-picks, reorder from past orders (logged-in)
   - [ ] Strict webhook idempotency + `openpay_webhook_events`; no duplicate SQS on replay
-  - [ ] Migrate guest cart → `cart_lines` on login/link; clear `cart_lines` on first paid webhook
+  - [ ] Migrate guest cart → cart on login/link; clear cart on first paid webhook
 - [ ] **Phase 3:** Single SQS queue + `kitchen_facility_id` attributes, print-daemon filter per LAN facility
   - [ ] Print failures: no delete, `ChangeMessageVisibility` backoff (60–300s), non-blocking poll loop
 - [ ] **Phase 4:** `/kitchen/dashboard` with 10s polling, facility-scoped orders and status lifecycle
@@ -80,7 +83,137 @@ flowchart LR
 | Deploy | **Sunset Cloudflare static** ([`wrangler.jsonc`](./wrangler.jsonc)) after EC2 Node app is live, stable, and DNS cut over; archive steps in `docs/legacy-static-deploy.md` |
 | Openpay config | Env-driven **sandbox vs production** toggle (see below); production webhook registered in Openpay dashboard |
 | Webhook idempotency | **Strict state gate:** if order already `paid`/`confirmed`, log duplicate and **200 OK** with no SQS or status side effects; audit in **`openpay_webhook_events`** |
-| Session / cart memory | **24h sliding TTL** on anonymous sessions and guest carts in Redis; logged-in working cart in **`cart_lines`** (PostgreSQL) until checkout completes—**not** a long-term saved cart |
+| Session / cart memory | **24h sliding TTL** on anonymous sessions and guest carts in Redis; logged-in working cart in PostgreSQL until checkout completes—**not** a long-term saved cart |
+| Retail catalog | **Meal builder** (protein + carb base + size + style)—**not** inventory ingredients; **templates** (19 named combos) + **packages** (POWER Chicken / POWER Mix); prices from Sistema Maestro V1 |
+| Menu filters (customer) | **High protein**, **High carb**, **Low calories**, **Vegetarian** (Spanish UI labels; see [Catalog and ordering model](#catalog-and-ordering-model)) |
+| Packages merchandising | Show package products on **home** and **`/menu`**; deep-link into `/pedido` with package preselected |
+
+## Catalog and ordering model
+
+**Question:** Does “build your own plate” require storing **inventory ingredients** (insumos) instead of **dishes**?
+
+**Answer: No—for the retail site.** Inventory ingredients (purchase units, yields, supplier SKUs in the ops workbook) stay **back-office** and are out of scope for customer checkout. The storefront sells **configured meals**: pick a **protein**, **carb/base**, **portion size** (Regular / Plus), and **plate style** (Balanced = carb + veggies, or Double carb = 2× same carb, no veggies), plus optional **premium protein upgrades** priced per the maestro file. That matches the **38 sellable SKUs** in `02 Menú SKU` without exposing raw grams of chicken or rice as shopper-facing “ingredients.”
+
+Kitchen and print still receive a **resolved line snapshot** (human-readable name, gramajes served, salsa rule, unit price)—same information density as today’s WhatsApp messages.
+
+### Three ways to add a meal to the cart
+
+| Path | Who | Source |
+|------|-----|--------|
+| **Build your own** | Everyone | Validated combination of builder options → price from rules (base tier + premium upgrade + size) |
+| **Templates** | Everyone | Curated rows matching the 19 named platillos in Sistema Maestro (e.g. “Pollo + arroz + veggies”)—one tap fills the builder |
+| **Order again** | Logged-in customers | Copy line composition from a previous **`order_line_items`** row (scoped to `user_id` via `/historial`) |
+
+Guests do not get persistent “order again” until they create an account or link after payment; they can still use builder + templates.
+
+### Retail categories (filters—not cost tiers)
+
+Replace the placeholder four tabs (`proteina`, `balanceado`, `ligero`, `desayuno`) with **customer-facing filters**. A template or builder result may appear under **multiple** filters when tagged.
+
+| Slug | English (plan) | Spanish UI (site) |
+|------|----------------|-------------------|
+| `alto-proteina` | High protein | Alto en proteína |
+| `alto-carbohidrato` | High carb | Alto en carbohidrato |
+| `bajas-calorias` | Low calories | Bajo en calorías |
+| `vegetariano` | Vegetarian | Vegetariano |
+
+**Tagging:** Seed rules from Sistema Maestro + ops review (e.g. ensalada / veggie-forward → vegetarian; pasta/camote/arroz-heavy → high carb; salad / lower portion targets → low calories; default protein meals → high protein). Tags are **merchandising**, not separate price lists. Commercial **Base vs Premium** protein tier (pollo vs arrachera vs salmón) remains on **proteins**, not on these four filters.
+
+### Packages (commercial products)
+
+From `05 Precios Paquetes`—sold as **bundle line items**, not as 6–15 separate dish rows:
+
+| Product | Meal counts | Sizes | Example prices (MXN) |
+|---------|-------------|-------|----------------------|
+| POWER Chicken | 6 / 10 / 15 | Regular / Plus | e.g. 649 / 999 / 1499 (Regular) |
+| POWER Mix | 6 / 10 / 15 | Regular / Plus | e.g. 749 / 1199 / 1699 (Regular) |
+
+**UI:** Dedicated section on **home** and **`/menu`** (cards + CTA to `/pedido?paquete=…`). Checkout expands a package into **N meal slots** (customer fills each slot via builder or template) or a simplified “chef’s mix” flow—implementation detail in Phase 2 UI; DB stores **`package_id`**, **`package_tier`**, and per-slot compositions.
+
+### Pricing rules (from Sistema Maestro V1)
+
+- **Individual base** (pollo / molida / basa / ensalada): Regular **$139**, Plus **$179** per meal.
+- **Premium upgrades** (add to base price per meal): Asada +25/+35, Sirloin +35/+50, Arrachera +50/+75, Salmón +75/+110 (Regular / Plus).
+- **Salsa:** 1 oz Roja or Verde included (store as line note / kitchen flag, not a priced modifier).
+- Server **recomputes** totals at checkout; never trust client-submitted prices.
+
+### Database changes (Phase 2 catalog migration)
+
+Phase 0 shipped a simplified **`categories` + `dishes`** model for bootstrap seed. Phase 2 adds a **catalog migration** (`drizzle/0001_catalog_builder.sql` or similar) rather than modeling shopper-facing “ingredients.”
+
+**Keep / extend**
+
+| Table | Role |
+|-------|------|
+| `kitchen_facilities`, zones, pickup, orders, payments, webhooks | Unchanged |
+| `order_items` | **Replace or supersede** with **`order_line_items`** that snapshot builder output (see below) |
+
+**New or repurposed catalog tables**
+
+| Table | Purpose |
+|-------|---------|
+| `catalog_filters` | The four retail filters (slug, Spanish label, sort order) |
+| `proteins` | Sellable proteins: pollo, molida, basa, asada, sirloin, arrachera, salmón; `tier` (`base` \| `premium`); upgrade deltas Regular/Plus |
+| `carb_bases` | Puré, camote, pasta, arroz, ensalada; flags for `allows_double_carb`, veggie pairing |
+| `portion_sizes` | `regular`, `plus`; gramajes served (protein g, carb g, veg g, double-carb g) |
+| `meal_templates` | Named quick-picks (19 platillos); FKs to protein + carb_base; optional default size/style; `sku_code` (SKU-01…SKU-38 mapping for ops) |
+| `meal_template_filters` | M:N → `catalog_filters` |
+| `meal_packages` | POWER Chicken / POWER Mix variants (meal count, size, price_cents, rules JSON) |
+| `cart_line_items` | **Replaces `cart_lines` dish-only shape:** `user_id`, `quantity`, `source` (`builder` \| `template` \| `reorder` \| `package_slot`), composition FKs or jsonb, `unit_price_cents` cache, `updated_at` |
+| `package_cart_lines` | Optional: package header in cart linking multiple slot lines |
+
+**`order_line_items` (fulfillment snapshot)**
+
+| Column | Purpose |
+|--------|---------|
+| `order_id`, `quantity` | Standard |
+| `display_name` | Spanish label printed on receipt |
+| `unit_price_cents`, `line_total_cents` | Frozen at order time |
+| `protein_id`, `carb_base_id`, `portion_size`, `plate_style` | `balanced` \| `double_carb` |
+| `protein_grams`, `carb_grams`, `veg_grams` | Served weights for kitchen |
+| `salsa_note` | e.g. “1 oz Roja/Verde” |
+| `template_id` | Nullable; set when added via template |
+| `package_id` | Nullable; set when line belongs to a package bundle |
+
+**Deprecate after migration:** `dishes` and legacy `categories` (or rename `categories` → `catalog_filters` in a single migration if simpler). Seed script: import from **Sistema Maestro** xlsx (`02 Menú SKU`, `05 Precios Paquetes`); retire placeholder [`lib/menu-data.ts`](./lib/menu-data.ts) for production paths.
+
+**Reorder:** No extra table—query prior `order_line_items` joined to `orders` where `orders.user_id = session user` and status not cancelled; “Pedir de nuevo” clones composition into `cart_line_items`.
+
+```mermaid
+flowchart TD
+  subgraph shopper [Customer]
+    Builder[Build your own]
+    Templates[Template quick-picks]
+    Reorder[Order again]
+    Packages[Package bundles]
+  end
+  subgraph catalog [PostgreSQL catalog]
+    Proteins[proteins]
+    Carbs[carb_bases]
+    Sizes[portion_sizes]
+    Tpl[meal_templates]
+    Pkg[meal_packages]
+    Filters[catalog_filters]
+  end
+  subgraph cart [Cart until checkout]
+    CLI[cart_line_items]
+  end
+  Builder --> Proteins
+  Builder --> Carbs
+  Builder --> Sizes
+  Templates --> Tpl
+  Tpl --> Proteins
+  Tpl --> Carbs
+  Reorder --> CLI
+  Packages --> Pkg
+  Builder --> CLI
+  Templates --> CLI
+  Packages --> CLI
+```
+
+### Cart / Redis key update (Phase 1–2)
+
+Guest Redis cart stores **serialized cart line payloads** (composition + qty), not `dish_id` maps. Logged-in users use **`cart_line_items`** in PostgreSQL with the same shape. Update [`lib/cart/`](#session-and-cart-memory) helpers accordingly when implementing Phase 2.
 
 ## `kitchen_facilities` (PostgreSQL + Drizzle)
 
@@ -163,7 +296,7 @@ sequenceDiagram
 **Rules:**
 
 - **State gate:** If `orders.status` is already `paid` or `confirmed`, log the event as a duplicate, persist an audit row in `openpay_webhook_events` when not already stored for this event/transaction id, return **`200 OK` immediately**. Do **not** update status again, **do not** publish to SQS, **do not** trigger duplicate fulfillment side effects.
-- **First-time success:** In a single DB transaction: set status to `paid` / `confirmed`, write Openpay charge/transaction ids on `payments` / `orders`, insert processed webhook record, **delete `cart_lines` for the order’s user** (if `user_id` is set). Enqueue SQS (Phase 3) only in this first-success path—or immediately after commit using an idempotency key tied to `order_id` so replays cannot double-send.
+- **First-time success:** In a single DB transaction: set status to `paid` / `confirmed`, write Openpay charge/transaction ids on `payments` / `orders`, insert processed webhook record, **delete `cart_line_items` for the order’s user** (if `user_id` is set). Enqueue SQS (Phase 3) only in this first-success path—or immediately after commit using an idempotency key tied to `order_id` so replays cannot double-send.
 - On **`charge.succeeded`** (and equivalent success types): follow the branch above (redirect return alone is not sufficient).
 
 **Table `openpay_webhook_events`** (Phase 0 Drizzle):
@@ -188,7 +321,7 @@ Unique indexes on `openpay_event_id` and/or `openpay_transaction_id` where appli
 **Redis key patterns:**
 
 - `session:{sessionId}` — session payload (`userId`, `role`, etc.)
-- `cart:session:{sessionId}` — guest cart (dish id/slug → quantity)
+- `cart:session:{sessionId}` — guest cart (serialized **meal line** payloads: builder/template/package slot + quantity; see [Catalog and ordering model](#catalog-and-ordering-model))
 
 **TTL policy:**
 
@@ -198,9 +331,9 @@ Unique indexes on `openpay_event_id` and/or `openpay_transaction_id` where appli
 **Cart persistence (until checkout only):**
 
 - **Guest:** cart lives only in Redis (`cart:session:{sessionId}`).
-- **On login or post-payment account link:** migrate guest cart into PostgreSQL **`cart_lines`**: `user_id`, `dish_id`, `quantity`, `updated_at`; merge overlapping lines; delete guest Redis cart key; bind session to `userId`.
-- **Logged-in shopper:** read/write `cart_lines` in PostgreSQL for the active shopping session.
-- **After successful payment (webhook first-success):** delete all `cart_lines` for that user; clear any optional Redis `cart:user:{userId}` cache. No long-term saved cart between visits.
+- **On login or post-payment account link:** migrate guest cart into PostgreSQL **`cart_line_items`** (same composition shape as catalog model); merge identical lines; delete guest Redis cart key; bind session to `userId`.
+- **Logged-in shopper:** read/write **`cart_line_items`** in PostgreSQL for the active shopping session.
+- **After successful payment (webhook first-success):** delete all **`cart_line_items`** for that user; clear any optional Redis `cart:user:{userId}` cache. No long-term saved cart between visits. **Order history** (`order_line_items`) remains for reorder.
 
 Implement migration in `lib/cart/` (called from auth and account-link flows in Phase 2).
 
@@ -243,29 +376,42 @@ Implement migration in `lib/cart/` (called from auth and account-link flows in P
 
 **Exit criteria:** Customer sees only own orders; staff user cannot access `/historial` of others; auth endpoints rate-limited; guest session/cart keys expire after 24h without activity and TTL refreshes on touch.
 
+**Status:** Code complete and verified against local Postgres + Redis with `next build && next start`.
+
+- Sessions: [`lib/session/`](./lib/session/index.ts), cookie `pm_session` (`HttpOnly`, `SameSite=Strict`, `Secure` in production). Redis holds the expiry; every read slides `session:*` and `cart:session:*`. The id rotates on login and registration, and the guest cart moves to the new id.
+- Auth: route handlers `POST /api/auth/{register,login,logout}` (so the Nginx `/api/auth/` limit applies), same-origin check, Redis sliding-window limits: login 20 per 15 min per IP and 5 per 15 min per email; register 5 per hour per IP. Argon2id 19 MiB / t=2 / p=1 with `PASSWORD_PEPPER` as the Argon2 secret; login against a missing account still runs a hash.
+- Authorization: [`lib/auth/dal.ts`](./lib/auth/dal.ts) loads the role from Postgres on each request. No `proxy.ts`: guards run in each page, per the Next 16 guidance. `/kitchen/*` returns 404 unless `kitchen_staff` with a facility.
+- Pages: `/ingresar`, `/registro`, `/cuenta`, `/historial`, `/kitchen/dashboard` (placeholder for Phase 4). Marketing pages stay static; the header always links to `/cuenta`.
+- Cart: [`lib/cart/`](./lib/cart/index.ts) + `GET`/`PUT /api/cart`, lines typed `{ kind: "dish", slug, quantity }` so Phase 2 can add builder/template/package kinds. The order form does not use it yet.
+- Staff: `npm run user:create-staff` (see [`docs/ec2-setup.md`](./docs/ec2-setup.md)).
+- Deferred to Phase 2: `migrateGuestCartToUser` (needs `cart_line_items`). Before Phase 2 checkout: `SameSite=Strict` means the cookie is **not sent** on the top-level redirect back from Openpay, so the return page must not depend on the session (look the order up by its id/token instead), or relax to `Lax`.
+
 ---
 
 ## Phase 2 — Catalog, cart, and Openpay checkout
 
-**Goal:** Openpay as primary conversion; paid orders in PostgreSQL; WhatsApp preserved as fallback.
+**Goal:** Openpay as primary conversion; paid orders in PostgreSQL; WhatsApp preserved as fallback; catalog matches Sistema Maestro with builder + templates + packages.
 
 **Work:**
 
-- Refactor menu/ubicaciones/pedido to load catalog from DB (keep same Spanish UX and deep links: `?platillo=`, `?zona=`, `?punto=`).
-- **Cart:** guests use Redis (`cart:session:*`); authenticated users use **`cart_lines`** in PostgreSQL; sync quantities server-side; validate prices at checkout time from DB (never trust client totals).
-- **Login / account link:** call `migrateGuestCartToUser`—merge into `cart_lines`, remove guest Redis cart key.
+- **Schema:** Apply [Phase 2 catalog migration](#database-changes-phase-2-catalog-migration) (`proteins`, `carb_bases`, `meal_templates`, `meal_packages`, `catalog_filters`, `cart_line_items`, `order_line_items`); seed from Sistema Maestro xlsx; deprecate placeholder `dishes` / legacy category tabs.
+- **Menu & home:** Load filters (**Alto en proteína**, **Alto en carbohidrato**, **Bajo en calorías**, **Vegetariano**), templates, and **package cards** from DB on [`app/menu/page.tsx`](./app/menu/page.tsx) and home ([`app/page.tsx`](./app/page.tsx)).
+- **Pedido:** Meal **builder** (protein + base + Regular/Plus + Balanced/Double carb); **template** chips; **order again** for logged-in users; **package** flow with deep links `?paquete=`, `?plantilla=`, plus existing `?zona=`, `?punto=`.
+- Refactor ubicaciones/pedido fulfillment fields from DB where applicable.
+- **Cart:** guests use Redis (`cart:session:*`); authenticated users use **`cart_line_items`**; sync quantities server-side; validate prices at checkout from pricing rules (never trust client totals).
+- **Login / account link:** call `migrateGuestCartToUser`—merge into `cart_line_items`, remove guest Redis cart key.
 - Refactor [`OrderForm.tsx`](./components/OrderForm.tsx) (or successor):
   - **Primary submit:** “Pagar con Openpay” (or brand-aligned label) → server creates order + redirect URL.
   - **Secondary control:** link-style button **“¿Prefieres pagar por WhatsApp?”** → existing [`buildWhatsAppUrl`](./lib/whatsapp.ts) / popup-blocked fallback UX; does **not** create a paid `orders` row unless you later add manual order ingestion.
 - Checkout flow (Openpay path):
   1. Collect guest contact (name, phone, email for receipt/link) + fulfillment fields (reuse validation from current form).
-  2. Create `orders` row `status = pending_payment`, line items, set `kitchen_facility_id` from zone/pickup FK.
+  2. Create `orders` row `status = pending_payment`, **`order_line_items`** (builder snapshots + package lines), set `kitchen_facility_id` from zone/pickup FK.
   3. Create Openpay **redirect** charge using sandbox or prod base URL from `OPENPAY_SANDBOX_MODE`; customer returns to success/cancel URLs on EC2.
   4. **Webhook** `POST /api/webhooks/openpay`: implement **strict idempotency** (see **Webhook idempotency (strict)**)—`charge.succeeded` only drives paid status, SQS, and cart clear on first success.
   5. Success page: order summary + **“Crear cuenta”** pre-filled email → link order to new user (one-time token in Redis or signed link); account link also runs cart migration if a guest cart remains.
 - Logging: structured logs without card data; webhook replay protection via `openpay_webhook_events` + order status gate.
 
-**Exit criteria:** End-to-end sandbox payment creates paid order; guest can link account; order appears in `/historial` after link; replaying the same webhook twice yields one SQS publish and second response **200 OK** with duplicate audit log; login preserves cart via `cart_lines`; paid webhook clears `cart_lines` for the user.
+**Exit criteria:** End-to-end sandbox payment creates paid order with resolved meal lines; guest can link account; order appears in `/historial` with reorder; packages visible on home and `/menu`; builder + templates work; replaying the same webhook twice yields one SQS publish and second response **200 OK** with duplicate audit log; login preserves cart via `cart_line_items`; paid webhook clears cart for the user.
 
 ---
 
@@ -276,7 +422,7 @@ Implement migration in `lib/cart/` (called from auth and account-link flows in P
 **Work:**
 
 - After webhook **first-success** commit: publish JSON body to **one shared SQS queue** with `MessageAttributes`: `kitchen_facility_id` (String), optional `order_id` for tracing (never publish on duplicate webhook).
-- Payload spec: order id, facility, customer phone, fulfillment type, address/pickup, line items, notes, timestamps, status.
+- Payload spec: order id, facility, customer phone, fulfillment type, address/pickup, **order_line_items** (display name, gramajes, style, salsa), notes, timestamps, status.
 - DLQ on queue + max receives; CloudWatch alarm on DLQ depth.
 
 ### Print daemon — success, failure, and non-blocking poll
@@ -353,11 +499,11 @@ app/
 lib/
   db/              # Drizzle client, schema.ts, queries
   session/
-  cart/            # Redis guest cart, cart_lines access, migration
+  cart/            # Redis guest cart, cart_line_items access, migration
   openpay/
   sqs/
   auth/
-  catalog/         # DB reads replacing direct menu-data imports
+  catalog/         # Builder pricing, templates, packages, filters; seed from Sistema Maestro
 packages/
   print-daemon/    # deployable separately to kitchen PCs
 drizzle/           # Drizzle Kit migrations + meta
@@ -401,7 +547,8 @@ Phases 3 and 4 can overlap once Phase 2 webhooks are stable.
 | v2 deliverable | Where it lands |
 |--------------|----------------|
 | Project file structure | Recommended repo structure above |
-| Database schema | Drizzle `lib/db/schema.ts` + `drizzle/` migrations; optional `schema.sql` |
+| Database schema | Drizzle `lib/db/schema.ts` + `drizzle/` migrations; Phase 2 catalog builder tables + `order_line_items` |
+| Meal builder + packages | `lib/catalog/` + `meal_templates` / `meal_packages`; home + `/menu` sections |
 | Redis session configuration | `lib/session/` (Phase 1) |
 | Order placement + SQS dispatch | Openpay webhook handler + `lib/sqs/` (Phases 2–3) |
 | Kitchen dashboard layout | `app/kitchen/dashboard/` (Phase 4) |

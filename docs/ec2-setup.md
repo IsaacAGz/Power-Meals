@@ -14,7 +14,8 @@ flowchart LR
 ## 1. App user and layout
 
 ```bash
-sudo useradd --system --create-home --home-dir /srv/power-meals --shell /usr/sbin/nologin powermeals
+sudo useradd --system --no-create-home --home-dir /srv/power-meals --shell /usr/sbin/nologin powermeals
+sudo install -d -o powermeals -g powermeals /srv/power-meals
 sudo -u powermeals git clone <repo-url> /srv/power-meals
 ```
 
@@ -29,6 +30,8 @@ sudo chmod 600 /srv/power-meals/.env
 ```
 
 The systemd unit loads this file through `EnvironmentFile`. Nothing secret lives in the repo or in the unit file.
+
+`PASSWORD_PEPPER` (`openssl rand -base64 32`) is mixed into every password hash. If it is lost or changed, nobody can log in, so back it up alongside the database credentials.
 
 ## 3. PostgreSQL (localhost only)
 
@@ -112,6 +115,20 @@ journalctl -u power-meals -f
 
 `db:seed` is safe to re-run: it upserts by slug and never deletes rows. Zone and pickup-point routing to kitchens can be changed directly in the database; re-seeding does not overwrite `kitchen_facility_id` on existing zones or points.
 
+### Kitchen staff accounts
+
+Staff can't self-register. Create each account for one kitchen (`zona-rio`, `otay`, `plaza-monarca`, `rio-tijuana-3ra-etapa`):
+
+```bash
+cd /srv/power-meals
+read -rs STAFF_PASSWORD && export STAFF_PASSWORD   # typed without echo, kept out of shell history
+sudo -u powermeals --preserve-env=STAFF_PASSWORD npm run user:create-staff -- \
+  --email cocina.otay@powermeals.mx --name "Cocina Otay" --facility otay
+unset STAFF_PASSWORD
+```
+
+Staff log in at `/ingresar` and land on `/kitchen/dashboard`, which only shows their own kitchen.
+
 ## 7. Nginx
 
 Merge [`deploy/nginx/powermeals.conf`](../deploy/nginx/powermeals.conf) into the existing config. Uncomment the `set_real_ip_from` block with CloudFront's origin-facing ranges; without it every rate limit applies per CloudFront edge rather than per client.
@@ -134,7 +151,7 @@ Returns `503` with `"degraded"` and the failing check when PostgreSQL or Redis i
 | `/_next/static/*` | CachingOptimized | Hashed filenames, immutable |
 | `/images/*`, `/maplibre/*`, `/logo.svg` | CachingOptimized | Public assets |
 | `/api/*` | CachingDisabled | Forward all headers, cookies, query strings |
-| `/kitchen/*`, `/cuenta*`, `/historial*`, `/pedido*` | CachingDisabled | Session-bound pages |
+| `/kitchen/*`, `/cuenta*`, `/historial*`, `/ingresar*`, `/registro*`, `/pedido*` | CachingDisabled | Session-bound pages |
 | Default (`*`) | UseOriginCacheControlHeaders | Static marketing pages send `public` headers; dynamic ones send `private, no-store` |
 
 Forward the session cookie only on the uncached behaviors so cached responses never vary by user.

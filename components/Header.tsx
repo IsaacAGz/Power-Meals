@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { List, X } from "@phosphor-icons/react";
+import { List, UserCircle, X } from "@phosphor-icons/react";
 import { Logo } from "./Logo";
 import { buttonPrimary, container } from "@/lib/ui";
 
@@ -60,6 +60,14 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-2">
+            <Link
+              href="/cuenta"
+              aria-label="Mi cuenta"
+              aria-current={pathname.startsWith("/cuenta") ? "page" : undefined}
+              className="hidden size-10 items-center justify-center rounded-control border border-line-strong text-ink transition-[transform,border-color] hover:border-ink active:scale-[0.96] lg:inline-flex"
+            >
+              <UserCircle weight="bold" className="size-5" />
+            </Link>
             <Link href="/pedido" className={`${buttonPrimary} h-10 px-4 text-sm`}>
               Pedir
             </Link>
@@ -79,7 +87,7 @@ export function Header() {
 
       <div id="menu-movil" hidden={!open} className="fixed inset-x-0 top-16 bottom-0 z-50 bg-cream lg:hidden">
         <nav aria-label="Móvil" className={`${container} flex flex-col pt-6`}>
-          {[{ href: "/", label: "Inicio" }, ...navLinks].map((link) => (
+          {[{ href: "/", label: "Inicio" }, ...navLinks, { href: "/cuenta", label: "Mi cuenta" }].map((link) => (
             <Link
               key={link.href}
               href={link.href}
