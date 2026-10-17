@@ -2,13 +2,14 @@ import "server-only";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 
-export type PublicStatus = "pending" | "paid" | "failed";
+export type PublicStatus = "pending" | "paid" | "failed" | "whatsapp";
 
 type OrderStatus = (typeof schema.orderStatus.enumValues)[number];
 
 export function toPublicStatus(status: OrderStatus): PublicStatus {
   if (status === "pending_payment") return "pending";
   if (status === "cancelled") return "failed";
+  if (status === "ordered_whatsapp") return "whatsapp";
   return "paid";
 }
 

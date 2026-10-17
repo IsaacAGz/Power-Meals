@@ -30,6 +30,7 @@ export const userRole = pgEnum("user_role", ["customer", "kitchen_staff", "admin
 
 export const orderStatus = pgEnum("order_status", [
   "pending_payment",
+  "ordered_whatsapp",
   "paid",
   "confirmed",
   "preparing",

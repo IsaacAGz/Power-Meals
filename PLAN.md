@@ -10,7 +10,7 @@ Related: [power-meals-v2.md](./power-meals-v2.md) (engineering brief), [power-me
 - [x] **Phase 1:** Redis sessions, Argon2id + pepper, auth rate limits, `/cuenta` `/historial`, kitchen role
   - [x] 24h sliding TTL on `session:*` and `cart:session:*`; `REDIS_SESSION_TTL_SECONDS=86400`
   - [x] Guest cart in Redis; `lib/cart/` helpers for touch + migration prep
-- [ ] **Phase 2:** DB-backed catalog/cart, Openpay checkout + webhook, guest post-payment account linking (code complete; needs a real Openpay sandbox payment, see [Phase 2 status](#phase-2--catalog-cart-and-openpay-checkout))
+- [x] **Phase 2:** DB-backed catalog/cart, Openpay checkout + webhook, guest post-payment account linking (code complete; Openpay stays off until [Phase 2b](#phase-2b--openpay-activation-deferred))
   - [x] **Catalog migration (see [Catalog and ordering model](#catalog-and-ordering-model)):** meal builder + templates + packages; retail categories (4 filters); seed from Sistema Maestro xlsx—not inventory ingredients
   - [x] **Packages UI:** POWER Chicken / POWER Mix on [`app/page.tsx`](./app/page.tsx) (home) and [`app/menu/page.tsx`](./app/menu/page.tsx)
   - [x] **Pedido UX:** build-your-own plate, template quick-picks, reorder from past orders (logged-in)
@@ -19,10 +19,13 @@ Related: [power-meals-v2.md](./power-meals-v2.md) (engineering brief), [power-me
   - [x] Sessionless `/pedido/success` + `/pedido/cancel` + public status polling API
   - [x] Post-payment **“Crea una cuenta para guardar este pedido”** + attach order to user
   - [x] Migrate guest cart → cart on login/link; clear cart on first paid webhook
+  - [x] **Copy while Openpay is off:** home, `/menu`, footer, and `/pedido` follow `isOpenpayConfigured()` and describe WhatsApp + transferencia; they do not promise card payment
+- [ ] **Phase 2b — Openpay activation (deferred):** sandbox merchant id + private key, webhook user/password, one real sandbox payment, then restore the card-payment copy (see [Phase 2b](#phase-2b--openpay-activation-deferred))
+- [x] **Phase 2c — WhatsApp order ingestion:** store the order only for a logged-in user, or when that guest logs in afterward; status `ordered_whatsapp`, never `paid` (see [Phase 2c](#phase-2c--whatsapp-order-ingestion))
 - [ ] **Phase 3:** Single SQS queue + `kitchen_facility_id` attributes, print-daemon filter per LAN facility
   - [ ] Print failures: no delete, `ChangeMessageVisibility` backoff (60–300s), non-blocking poll loop
-- [ ] **Phase 4:** `/kitchen/dashboard` with 10s polling, facility-scoped orders and status lifecycle
-- [ ] **Phase 5:** Openpay prod toggle + powermeals.mx webhook, EC2 stability gate, sunset Cloudflare static
+- [x] **Phase 4:** `/kitchen/dashboard` with 10s polling, facility-scoped orders and status lifecycle (see [Phase 4 status](#phase-4--kitchen-staff-dashboard))
+- [ ] **Phase 5:** Openpay prod toggle (after Phase 2b) + powermeals.mx webhook, EC2 stability gate, sunset Cloudflare static
 
 ---
 
@@ -83,7 +86,9 @@ flowchart LR
 | Openpay UX | **Redirect checkout** (hosted payment page); webhook confirms payment; sandbox → prod keys in env |
 | SQS | **Single queue**; `MessageAttributes.kitchen_facility_id` on publish; each LAN daemon long-polls same queue and **skips/deletes only messages matching its facility** |
 | Kitchen dashboard | **10-second client polling** to refresh order list (no SSE/WebSockets in v1) |
-| Checkout UX | **Openpay primary** (pay CTA); secondary text button **“¿Prefieres pagar por WhatsApp?”** reuses [`lib/whatsapp.ts`](./lib/whatsapp.ts) prefilled `wa.me` link (transfer flow, no card) |
+| Checkout UX | **Openpay primary** when configured (pay CTA); secondary text button **“¿Prefieres pagar por WhatsApp?”** reuses [`lib/whatsapp.ts`](./lib/whatsapp.ts) prefilled `wa.me` link (transfer flow, no card). **Until Openpay is connected, WhatsApp is the only checkout** and the pay button stays hidden |
+| Openpay rollout | Integration **stays in the repo and stays off** until Phase 2b. No merchant id / private key means `isOpenpayConfigured()` is false: `/pedido` hides the card button, `POST /api/checkout` returns 503, and the webhook refuses to mark anything paid |
+| WhatsApp orders | A WhatsApp checkout is stored **only with a `user_id`**: immediately if the customer is logged in, or on the later login/register from the same browser session. Status is **`ordered_whatsapp`**, not `paid`. Guests who never log in leave no `orders` row |
 | Deploy | **Sunset Cloudflare static** ([`wrangler.jsonc`](./wrangler.jsonc)) after EC2 Node app is live, stable, and DNS cut over; archive steps in `docs/legacy-static-deploy.md` |
 | Openpay config | Env-driven **sandbox vs production** toggle (see below); production webhook registered in Openpay dashboard |
 | Webhook idempotency | **Strict state gate:** if order already `paid`/`confirmed`, log duplicate and **200 OK** with no SQS or status side effects; audit in **`openpay_webhook_events`** |
@@ -491,7 +496,7 @@ Implement migration in `lib/cart/` (called from auth and account-link flows in P
 - **Login / account link:** call `migrateGuestCartToUser`—merge into `cart_line_items`, remove guest Redis cart key.
 - Refactor [`OrderForm.tsx`](./components/OrderForm.tsx) (or successor):
   - **Primary submit:** “Pagar con Openpay” (or brand-aligned label) → server creates order + redirect URL.
-  - **Secondary control:** link-style button **“¿Prefieres pagar por WhatsApp?”** → existing [`buildWhatsAppUrl`](./lib/whatsapp.ts) / popup-blocked fallback UX; does **not** create a paid `orders` row unless you later add manual order ingestion.
+  - **Secondary control:** link-style button **“¿Prefieres pagar por WhatsApp?”** → existing [`buildWhatsAppUrl`](./lib/whatsapp.ts) / popup-blocked fallback UX. Phase 2 does **not** create an `orders` row from it. [Phase 2c](#phase-2c--whatsapp-order-ingestion) stores one only for a logged-in user, with status `ordered_whatsapp` rather than `paid`.
 - Checkout flow (Openpay path):
   1. Collect guest contact (name, phone, email for receipt/link) + fulfillment fields (reuse validation from current form).
   2. Create `orders` row `status = pending_payment`, assign **`public_order_ref`**, **`order_line_items`** (builder snapshots + package lines), set `kitchen_facility_id` from zone/pickup FK.
@@ -503,7 +508,7 @@ Implement migration in `lib/cart/` (called from auth and account-link flows in P
 
 **Exit criteria:** End-to-end sandbox payment creates paid order with resolved meal lines; guest lands on **`/pedido/success?order_ref=…` without `pm_session`**, sees verifying → paid receipt; can register via **“Crea una cuenta…”** and see the order in `/historial`; packages visible on home and `/menu`; builder + templates work; replaying the same webhook twice yields one SQS publish and second response **200 OK** with duplicate audit log; login preserves cart via `cart_line_items`; paid webhook clears cart for the user.
 
-**Status:** Code complete. Verified with `next build && next start` against local Postgres + Redis and a mocked Openpay API; a real sandbox payment is still required for the exit criteria.
+**Status:** Catalog, cart, checkout code, and the Openpay-off copy are complete. Verified with `next build && next start` against local Postgres + Redis and a mocked Openpay API. **Openpay is not being connected yet**, so the sandbox-payment exit criterion moves to [Phase 2b](#phase-2b--openpay-activation-deferred). With no keys, home, `/menu`, the footer, and `/pedido` describe WhatsApp and transferencia. The return pages and webhook stay deployed and cannot mark an order paid. `db:migrate` / `db:seed` still apply.
 
 - Schema: [`drizzle/0001_catalog_builder.sql`](./drizzle/0001_catalog_builder.sql) adds the catalog tables, `cart_line_items`, `order_line_items` (a package is a header row plus one slot row per meal) and `orders.public_order_ref` (backfilled for existing rows). It drops `categories`, `dishes`, `order_items` and `cart_lines`. [`drizzle/0002_webhook_outcome.sql`](./drizzle/0002_webhook_outcome.sql) adds `openpay_webhook_events.outcome`.
 - Catalog: seeded from [`lib/catalog/seed-data.ts`](./lib/catalog/seed-data.ts): 7 proteins, 5 bases, 19 templates, 12 packages. Prices are recomputed server-side by [`lib/catalog/pricing.ts`](./lib/catalog/pricing.ts), which the builder also uses for previews.
@@ -520,13 +525,49 @@ Implement migration in `lib/cart/` (called from auth and account-link flows in P
 
 ---
 
-## Phase 3 — Kitchen dispatch (SQS + receipt contract)
+## Phase 2b — Openpay activation (deferred)
 
-**Goal:** Every paid order reliably reaches the correct kitchen for printing and dashboard.
+**Goal:** Turn on the checkout that Phase 2 already built. No new payment design; do not start this until sandbox credentials exist.
 
 **Work:**
 
-- After webhook **first-success** commit: publish JSON body to **one shared SQS queue** with `MessageAttributes`: `kitchen_facility_id` (String), optional `order_id` for tracing (never publish on duplicate webhook).
+- Set `OPENPAY_MERCHANT_ID`, `OPENPAY_PRIVATE_KEY`, `OPENPAY_SANDBOX_MODE=true`, `OPENPAY_WEBHOOK_USER`, and `OPENPAY_WEBHOOK_PASSWORD`. Set `NEXT_PUBLIC_SITE_URL` before building; it is inlined at build time, including the redirect URL.
+- Register `https://powermeals.mx/api/webhooks/openpay` (or the staging origin) in the Openpay dashboard with those basic-auth credentials. Confirm the verification code from the `openpay.webhook` log.
+- Run one real sandbox payment: pending order, redirect, webhook marks `paid` once, replay is `duplicate`, guest cart clears, `/pedido/success` shows the receipt and the account-link panel.
+- Restore the card-payment copy on home, `/menu`, the footer, and `/pedido` once `isOpenpayConfigured()` is true in that environment.
+
+**Exit criteria:** A real sandbox charge (not a mock) produces one paid order and a duplicate-safe webhook. Production keys stay in Phase 5.
+
+---
+
+## Phase 2c — WhatsApp order ingestion
+
+**Goal:** While Openpay is off, a WhatsApp checkout still becomes a kitchen-visible order, but only for a customer who has an account. The row records that they ordered through WhatsApp. It is not a payment.
+
+**Rules:**
+
+- **Logged in:** the WhatsApp button writes the order before opening `wa.me`. `orders.user_id` is that user. Status is **`ordered_whatsapp`**. `paid_at` stays null. The `payments` row stays `pending` with no Openpay charge id.
+- **Guest:** the click does **not** insert `orders`. It stores the priced cart and fulfillment fields in Redis (`whatsapp:order:{sessionId}`, same sliding TTL as the session). The WhatsApp message is what the customer sends; the snapshot is what we will store if they come back.
+- **Logs in afterward:** login and registration, on that same browser session, insert the order from the Redis snapshot with the new `user_id` and status `ordered_whatsapp`, then delete the snapshot. A guest who never logs in leaves no row; the snapshot expires with the session. Login on another device does not see it.
+- **Never `paid`.** `ordered_whatsapp` is not a paid status and does not publish to SQS. A later staff action (Phase 4), after the transfer is confirmed, is what moves it to `paid`. That transition is the first-success path Phase 3 already requires.
+- **Cart:** creating the row clears that user's cart, the same way a completed checkout does. Prices are recomputed on the server at click time; if a line is no longer in the catalog when a guest later logs in, skip the insert and leave the cart.
+- **Copy:** `/historial` labels these **“Pedido por WhatsApp”**, not “Pagado”.
+
+**Schema:** add `ordered_whatsapp` to the `order_status` enum. These rows always have `user_id`. Reuse `createPendingOrder`'s line snapshot; do not reuse its `pending_payment` status.
+
+**Exit criteria:** A logged-in WhatsApp checkout creates one `ordered_whatsapp` order and clears the cart. A guest checkout creates none until that session logs in or registers. Neither path sets `paid` or `paid_at`.
+
+**Status:** Implemented. `POST /api/orders/whatsapp` writes the row when a session user exists and otherwise stores `whatsapp:order:{sessionId}` (sliding TTL with the session). Login and registration claim that snapshot on the same browser session, re-price it, and skip the insert if a line is no longer in the catalog. `payments.provider` is `whatsapp` and stays `pending`. A card webhook cannot move this status to `paid`.
+
+---
+
+## Phase 3 — Kitchen dispatch (SQS + receipt contract)
+
+**Goal:** Every order that reaches `paid` reliably reaches the correct kitchen for printing and dashboard. `ordered_whatsapp` is not paid and is not published.
+
+**Work:**
+
+- After the **first transition to `paid`** (Openpay webhook, or Phase 4 confirming a WhatsApp transfer): publish JSON body to **one shared SQS queue** with `MessageAttributes`: `kitchen_facility_id` (String), optional `order_id` for tracing. Never publish on a duplicate webhook, and never publish for `ordered_whatsapp`.
 - Payload spec: order id, facility, customer phone, fulfillment type, address/pickup, **order_line_items** (display name, gramajes, style, salsa), notes, timestamps, status.
 - DLQ on queue + max receives; CloudWatch alarm on DLQ depth.
 
@@ -561,13 +602,16 @@ Implement migration in `lib/cart/` (called from auth and account-link flows in P
 **Work:**
 
 - Route: `/kitchen/dashboard` (Spanish UI, minimal chrome, large touch-friendly rows).
-- List orders for staff’s `kitchen_facility_id`, filters: Pending → Preparing → Ready → Completed.
+- List orders for staff’s `kitchen_facility_id`. Filters: **Pedido por WhatsApp** (`ordered_whatsapp`, unpaid) → Pending (`paid`) → Preparing → Ready → Completed. The WhatsApp filter is not shown as paid.
+- Confirming a bank transfer is an explicit staff action: `ordered_whatsapp` → `paid`, with an `order_status_events` row. That is the first `paid` transition, so Phase 3 publishes once from it. The ingestion in Phase 2c never does this.
 - Status updates: server action → PostgreSQL + append `order_status_events`; optional notify customer (email/SMS out of scope unless requested).
 - **10s interval polling** (`setInterval` + `fetch` or server action) for active-order list; pause when tab hidden optional (`document.visibilityState`).
 - Optimistic UI on status change with rollback on error.
 - Optional: sound/badge for new paid orders (detect new ids between poll ticks).
 
 **Exit criteria:** Status changes persist; retail `/historial` reflects status; only assigned facility orders visible.
+
+**Status:** Implemented. [`app/kitchen/dashboard/page.tsx`](./app/kitchen/dashboard/page.tsx) lists one kitchen's orders in the five columns. Confirming a transfer sets `ordered_whatsapp` → `paid` (`paid_at` set, payment `succeeded`) and writes `order_status_events`. Later steps are `paid` → `preparing` → `ready` → `completed`. The board polls `GET /api/kitchen/orders` every 10 seconds and pauses while the tab is hidden. SQS publish on that first `paid` transition is still Phase 3; the transition logs `kitchen.order_paid` so the publisher has one place to hook.
 
 ---
 
@@ -580,7 +624,7 @@ Implement migration in `lib/cart/` (called from auth and account-link flows in P
 - CSP updates in Nginx or Next headers: Openpay domains, retain MapTiler rules from [`public/_headers`](./public/_headers) pattern.
 - Backups: PostgreSQL daily to encrypted S3 (or EBS snapshots); Redis treated as ephemeral (sessions/carts OK to lose; document).
 - Nginx rate limits aligned with app-level auth limits.
-- Runbook: deploy, migrate, rollback, **Openpay sandbox → production** (merchant id, private key, `OPENPAY_SANDBOX_MODE=false`, webhook URL `https://powermeals.mx/api/webhooks/openpay`), rotate pepper (requires re-hash strategy or accept login-only rotation).
+- Runbook: deploy, migrate, rollback, **Openpay sandbox → production** only after [Phase 2b](#phase-2b--openpay-activation-deferred) (merchant id, private key, `OPENPAY_SANDBOX_MODE=false`, webhook URL `https://powermeals.mx/api/webhooks/openpay`), rotate pepper (requires re-hash strategy or accept login-only rotation).
 - Load test checkout webhook idempotency (`charge.succeeded` replay).
 - **Sunset Cloudflare static deploy** only after EC2 Node app passes stability criteria (health checks green, checkout + webhook smoke tests, brief soak period); then remove Workers as primary origin, point `powermeals.mx` at EC2/CloudFront per v2, move [`wrangler.jsonc`](./wrangler.jsonc) guidance to `docs/legacy-static-deploy.md`.
 
@@ -635,19 +679,24 @@ PLAN.md            # this document
 flowchart TD
   P0[Phase 0 Foundation]
   P1[Phase 1 Auth and sessions]
-  P2[Phase 2 Catalog and Openpay]
+  P2[Phase 2 Catalog and Openpay code]
+  P2b[Phase 2b Openpay activation]
+  P2c[Phase 2c WhatsApp orders]
   P3[Phase 3 SQS and print daemon]
   P4[Phase 4 Kitchen dashboard]
   P5[Phase 5 Hardening and cutover]
   P0 --> P1
   P1 --> P2
-  P2 --> P3
-  P2 --> P4
+  P2 --> P2b
+  P2 --> P2c
+  P2b --> P3
+  P2c --> P4
+  P4 --> P3
   P3 --> P5
-  P4 --> P5
+  P2b --> P5
 ```
 
-Phases 3 and 4 can overlap once Phase 2 webhooks are stable.
+Phase 4 can start from Phase 2c without Openpay: it lists `ordered_whatsapp` orders and, once a transfer is confirmed, moves them to `paid`. Phase 3 publishes only on that first `paid` transition (or on an Openpay webhook after Phase 2b). Phase 5 does not flip production Openpay keys before Phase 2b.
 
 ---
 
@@ -659,5 +708,5 @@ Phases 3 and 4 can overlap once Phase 2 webhooks are stable.
 | Database schema | Drizzle `lib/db/schema.ts` + `drizzle/` migrations; Phase 2 catalog builder tables + `order_line_items` |
 | Meal builder + packages | `lib/catalog/` + `meal_templates` / `meal_packages`; home + `/menu` sections |
 | Redis session configuration | `lib/session/` (Phase 1) |
-| Order placement + SQS dispatch | Openpay webhook handler + `lib/sqs/` (Phases 2–3) |
+| Order placement + SQS dispatch | Openpay webhook (Phase 2, activated in 2b) or WhatsApp ingestion as `ordered_whatsapp` (Phase 2c); `lib/sqs/` publishes only on the first `paid` transition (Phase 3) |
 | Kitchen dashboard layout | `app/kitchen/dashboard/` (Phase 4) |

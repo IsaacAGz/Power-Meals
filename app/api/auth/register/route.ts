@@ -3,9 +3,10 @@ import { authError, forbiddenOrigin, isUniqueViolation, tooManyAttempts, type Au
 import { parseRegistration, safeNextPath } from "@/lib/auth/validation";
 import { migrateGuestCartToUser } from "@/lib/cart";
 import { getDb, schema } from "@/lib/db";
+import { claimWhatsAppOrder } from "@/lib/orders/whatsapp";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { clientIp, isSameOrigin, readJsonBody } from "@/lib/request";
-import { rotateSession } from "@/lib/session";
+import { getSession, rotateSession } from "@/lib/session";
 
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) return forbiddenOrigin();
@@ -38,7 +39,9 @@ export async function POST(request: Request) {
     throw error;
   }
 
+  const guestSessionId = (await getSession())?.id;
   const session = await rotateSession({ userId });
   await migrateGuestCartToUser(session.id, userId);
+  if (guestSessionId) await claimWhatsAppOrder(guestSessionId, userId);
   return Response.json({ ok: true, redirectTo: safeNextPath(body.next, "/cuenta") } satisfies AuthResponse);
 }

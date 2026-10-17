@@ -2,7 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { cache } from "react";
-import { cartKey } from "@/lib/cart/keys";
+import { cartKey, whatsAppOrderKey } from "@/lib/cart/keys";
 import { getRedis } from "@/lib/redis";
 
 export const SESSION_COOKIE = "pm_session";
@@ -61,6 +61,7 @@ export const getSession = cache(async (): Promise<Session | null> => {
     .get(sessionKey(id))
     .expire(sessionKey(id), ttl)
     .expire(cartKey(id), ttl)
+    .expire(whatsAppOrderKey(id), ttl)
     .exec();
   const raw = results?.[0]?.[1];
   if (typeof raw !== "string") return null;

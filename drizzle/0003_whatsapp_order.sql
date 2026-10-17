@@ -1,0 +1,1 @@
+ALTER TYPE "public"."order_status" ADD VALUE 'ordered_whatsapp' BEFORE 'paid';

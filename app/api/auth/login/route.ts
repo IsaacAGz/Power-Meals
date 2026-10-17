@@ -5,9 +5,10 @@ import { authError, forbiddenOrigin, tooManyAttempts, type AuthResponse } from "
 import { parseLogin, safeNextPath } from "@/lib/auth/validation";
 import { migrateGuestCartToUser } from "@/lib/cart";
 import { getDb, schema } from "@/lib/db";
+import { claimWhatsAppOrder } from "@/lib/orders/whatsapp";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { clientIp, isSameOrigin, readJsonBody } from "@/lib/request";
-import { rotateSession } from "@/lib/session";
+import { getSession, rotateSession } from "@/lib/session";
 
 const WINDOW_SECONDS = 15 * 60;
 
@@ -35,7 +36,9 @@ export async function POST(request: Request) {
   const valid = user ? await verifyPassword(user.passwordHash, data.password) : await verifyAgainstDummy(data.password);
   if (!user || !valid) return authError(401, { message: "Correo o contraseña incorrectos." });
 
+  const guestSessionId = (await getSession())?.id;
   const session = await rotateSession({ userId: user.id });
   await migrateGuestCartToUser(session.id, user.id);
+  if (guestSessionId) await claimWhatsAppOrder(guestSessionId, user.id);
   return Response.json({ ok: true, redirectTo: safeNextPath(body.next, homeFor(user)) } satisfies AuthResponse);
 }

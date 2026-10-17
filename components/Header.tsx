@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { List, UserCircle, X } from "@phosphor-icons/react";
+import { LogoutButton } from "./auth/LogoutButton";
 import { Logo } from "./Logo";
 import { buttonPrimary, container } from "@/lib/ui";
 
@@ -34,6 +35,17 @@ export function Header() {
       document.body.style.overflow = "";
     };
   }, [open]);
+
+  if (pathname.startsWith("/kitchen")) {
+    return (
+      <header className="sticky top-0 z-40 border-b border-line bg-cream/90 backdrop-blur-md">
+        <div className={`${container} flex h-16 items-center justify-between gap-6`}>
+          <Logo />
+          <LogoutButton className="h-10 px-3 text-sm" />
+        </div>
+      </header>
+    );
+  }
 
   return (
     <>

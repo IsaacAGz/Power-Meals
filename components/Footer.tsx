@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "./Logo";
+import { isOpenpayConfigured } from "@/lib/openpay";
 import { WhatsAppButton } from "./WhatsAppButton";
 import { container } from "@/lib/ui";
 import { WHATSAPP_DISPLAY } from "@/lib/whatsapp";
@@ -43,7 +44,10 @@ export function Footer() {
 
       <div className="border-t border-line">
         <p className={`${container} py-6 text-[13px] text-muted`}>
-          © {year} Power Meals. Precios en MXN. Pago con tarjeta en Openpay o por transferencia vía WhatsApp.
+          © {year} Power Meals. Precios en MXN.{" "}
+          {isOpenpayConfigured()
+            ? "Pago con tarjeta en Openpay o por transferencia vía WhatsApp."
+            : "Pago por transferencia vía WhatsApp."}
         </p>
       </div>
     </footer>

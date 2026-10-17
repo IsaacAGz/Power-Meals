@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ArrowCounterClockwise, CheckCircle, WarningCircle } from "@phosphor-icons/react";
 import { addToCart, reorder, setCartQuantity, type CartResult } from "@/lib/cart/client";
-import type { CartView } from "@/lib/cart/view";
+import { emptyCartView, type CartView } from "@/lib/cart/view";
 import type { CartItem, Catalog } from "@/lib/catalog/types";
 import { formatCents } from "@/lib/format";
 import { CartSummary } from "./CartSummary";
@@ -25,6 +25,7 @@ export function OrderExperience({
   recentOrders,
   initial,
   openpayEnabled,
+  signedIn,
 }: {
   catalog: Catalog;
   initialCart: CartView;
@@ -34,6 +35,7 @@ export function OrderExperience({
   recentOrders: RecentOrder[];
   initial: { template?: string; package?: string; zone?: string; point?: string };
   openpayEnabled: boolean;
+  signedIn: boolean;
 }) {
   const [cart, setCart] = useState(initialCart);
   const [tab, setTab] = useState<Tab>(initial.package ? "paquete" : "platillo");
@@ -157,6 +159,15 @@ export function OrderExperience({
         initialZone={initial.zone}
         initialPoint={initial.point}
         openpayEnabled={openpayEnabled}
+        signedIn={signedIn}
+        onWhatsApp={({ saved }) => {
+          if (saved) {
+            setCart(emptyCartView());
+            setNotice({ tone: "ok", text: "Guardamos el pedido en tu cuenta como pedido por WhatsApp." });
+          } else {
+            setNotice({ tone: "ok", text: "Inicia sesión para guardar este pedido en tu cuenta." });
+          }
+        }}
       />
     </div>
   );

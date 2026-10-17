@@ -1,35 +1,15 @@
-import { and, eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { currentCartOwner, getPricedCart } from "@/lib/cart";
-import { getDb, schema } from "@/lib/db";
 import { createRedirectCharge, isOpenpayConfigured, OpenpayError } from "@/lib/openpay";
 import { readCheckoutInput, validateCheckout } from "@/lib/orders/checkout-input";
 import { abandonOrder, attachChargeToOrder, createPendingOrder } from "@/lib/orders/create";
+import { resolveFulfillment } from "@/lib/orders/fulfillment";
 import { rememberCheckoutCart } from "@/lib/orders/payment";
 import { receiptPath } from "@/lib/orders/ref";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { clientIp, isSameOrigin, readJsonBody, siteUrl } from "@/lib/request";
 
 const fail = (status: number, body: Record<string, unknown>) => Response.json({ ok: false, ...body }, { status });
-
-async function resolveFulfillment(input: ReturnType<typeof readCheckoutInput>) {
-  const db = getDb();
-  if (input.metodo === "entrega") {
-    const [zone] = await db
-      .select({ id: schema.deliveryZones.id, facilityId: schema.deliveryZones.kitchenFacilityId })
-      .from(schema.deliveryZones)
-      .where(and(eq(schema.deliveryZones.slug, input.zona), eq(schema.deliveryZones.isActive, true)));
-    return zone && {
-      fulfillment: { type: "delivery" as const, zoneId: zone.id, address: input.direccion },
-      kitchenFacilityId: zone.facilityId,
-    };
-  }
-  const [point] = await db
-    .select({ id: schema.pickupPoints.id, facilityId: schema.pickupPoints.kitchenFacilityId })
-    .from(schema.pickupPoints)
-    .where(and(eq(schema.pickupPoints.slug, input.punto), eq(schema.pickupPoints.isActive, true)));
-  return point && { fulfillment: { type: "pickup" as const, pickupPointId: point.id }, kitchenFacilityId: point.facilityId };
-}
 
 /** Creates a pending order from the server-side cart and returns the Openpay hosted payment URL. */
 export async function POST(request: Request) {

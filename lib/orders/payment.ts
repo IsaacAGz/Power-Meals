@@ -57,6 +57,8 @@ export async function recordChargeSucceeded(charge: Charge, event: WebhookEvent)
     const order = await lockOrder(tx, charge.orderId);
     if (!order) return logEvent(tx, event, null, "unknown_order");
     if (PAID_STATUSES.has(order.status)) return logEvent(tx, event, order.id, "duplicate");
+    // Only a card checkout waiting on Openpay can become paid here. ordered_whatsapp stays unpaid.
+    if (order.status !== "pending_payment") return logEvent(tx, event, order.id, "ignored");
     if (Math.round(charge.amount * 100) !== order.totalCents || charge.currency.toUpperCase() !== "MXN") {
       return logEvent(tx, event, order.id, "amount_mismatch");
     }

@@ -21,6 +21,8 @@ export function CheckoutForm({
   initialZone,
   initialPoint,
   openpayEnabled,
+  signedIn,
+  onWhatsApp,
 }: {
   cart: CartView;
   zones: ZoneOption[];
@@ -29,6 +31,8 @@ export function CheckoutForm({
   initialZone?: string;
   initialPoint?: string;
   openpayEnabled: boolean;
+  signedIn: boolean;
+  onWhatsApp?: (result: { saved: boolean }) => void;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [input, setInput] = useState<CheckoutInput>({
@@ -61,8 +65,7 @@ export function CheckoutForm({
     return !first && !empty;
   }
 
-  async function payWithOpenpay(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function payWithOpenpay() {
     setMessage("");
     if (!check(true)) return;
 
@@ -86,35 +89,70 @@ export function CheckoutForm({
     setPending(null);
   }
 
-  function sendWhatsApp() {
+  async function sendWhatsApp() {
     setMessage("");
     if (!check(false)) return;
 
-    const zone = zones.find((row) => row.slug === input.zona);
-    const point = points.find((row) => row.slug === input.punto);
-    const text = buildOrderMessage({
-      nombre: input.nombre.trim(),
-      telefono: input.telefono.trim(),
-      metodo: input.metodo,
-      zona: zone?.name,
-      direccion: input.direccion.trim(),
-      punto: point ? `${point.name}, ${point.address}` : undefined,
-      lineas: cart.lines.map((line) => ({
-        name: line.slotNames.length > 0 ? `${line.displayName} (${groupNames(line.slotNames).join("; ")})` : line.displayName,
-        price: line.unitPriceCents / 100,
-        quantity: line.quantity,
-      })),
-      notas: input.notas.trim() || undefined,
-    });
-    const url = buildWhatsAppUrl(text);
-    setWhatsAppUrl(url);
-    const opened = window.open(url, "_blank");
-    if (opened) opened.opener = null;
-    setPending(opened ? null : "whatsapp");
+    // Open the tab during the click, then point it at WhatsApp once the order is stored.
+    const popup = window.open("about:blank", "_blank");
+    if (popup) popup.opener = null;
+    setWhatsAppUrl("");
+    setPending("whatsapp");
+
+    try {
+      const response = await fetch("/api/orders/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const data = (await response.json()) as { ok: boolean; saved?: boolean; message?: string; errors?: CheckoutErrors };
+      if (!data.ok) {
+        popup?.close();
+        setErrors(data.errors ?? {});
+        setMessage(data.message ?? "No pudimos guardar el pedido.");
+        setPending(null);
+        return;
+      }
+
+      onWhatsApp?.({ saved: data.saved === true });
+      const zone = zones.find((row) => row.slug === input.zona);
+      const point = points.find((row) => row.slug === input.punto);
+      const text = buildOrderMessage({
+        nombre: input.nombre.trim(),
+        telefono: input.telefono.trim(),
+        metodo: input.metodo,
+        zona: zone?.name,
+        direccion: input.direccion.trim(),
+        punto: point ? `${point.name}, ${point.address}` : undefined,
+        lineas: cart.lines.map((line) => ({
+          name: line.slotNames.length > 0 ? `${line.displayName} (${groupNames(line.slotNames).join("; ")})` : line.displayName,
+          price: line.unitPriceCents / 100,
+          quantity: line.quantity,
+        })),
+        notas: input.notas.trim() || undefined,
+      });
+      const url = buildWhatsAppUrl(text);
+      if (popup) {
+        popup.location.href = url;
+        setPending(null);
+        return;
+      }
+      setWhatsAppUrl(url);
+    } catch {
+      popup?.close();
+      setMessage("No pudimos conectar. Revisa tu conexión e intenta de nuevo.");
+      setPending(null);
+    }
+  }
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (openpayEnabled) void payWithOpenpay();
+    else void sendWhatsApp();
   }
 
   return (
-    <form ref={formRef} onSubmit={payWithOpenpay} noValidate className="flex flex-col gap-10">
+    <form ref={formRef} onSubmit={onSubmit} noValidate className="flex flex-col gap-10">
       <fieldset className="grid gap-5 sm:grid-cols-2">
         <legend className="mb-5 font-display text-2xl font-extrabold tracking-tight">Tus datos</legend>
         <FormField label="Nombre" error={errors.nombre}>
@@ -147,7 +185,17 @@ export function CheckoutForm({
           )}
         </FormField>
         <div className="sm:col-span-2">
-          <FormField label="Correo" error={errors.correo} hint="Con este correo puedes guardar el pedido en una cuenta después de pagar.">
+          <FormField
+            label="Correo"
+            error={errors.correo}
+            hint={
+              openpayEnabled
+                ? "Con este correo puedes guardar el pedido en una cuenta después de pagar."
+                : signedIn
+                  ? "Este pedido se guarda en tu cuenta al enviarlo."
+                  : "Si inicias sesión después, guardamos el pedido en tu cuenta."
+            }
+          >
             {(props) => (
               <input
                 {...props}
@@ -278,22 +326,26 @@ export function CheckoutForm({
               {formatCents(cart.totalCents)} <span className="text-sm text-muted">MXN</span>
             </p>
           </div>
-          <button
-            type="submit"
-            disabled={pending === "openpay" || !openpayEnabled}
-            className={`${buttonPrimary} sm:min-w-[260px]`}
-          >
-            {pending === "openpay" ? (
-              <CircleNotch weight="bold" className="size-5 motion-safe:animate-spin" aria-hidden />
-            ) : (
-              <CreditCard weight="bold" className="size-5" aria-hidden />
-            )}
-            {pending === "openpay" ? "Abriendo Openpay" : "Pagar con Openpay"}
-          </button>
+          {openpayEnabled ? (
+            <button type="submit" disabled={pending === "openpay"} className={`${buttonPrimary} sm:min-w-[260px]`}>
+              {pending === "openpay" ? (
+                <CircleNotch weight="bold" className="size-5 motion-safe:animate-spin" aria-hidden />
+              ) : (
+                <CreditCard weight="bold" className="size-5" aria-hidden />
+              )}
+              {pending === "openpay" ? "Abriendo Openpay" : "Pagar con Openpay"}
+            </button>
+          ) : (
+            <button type="submit" disabled={pending === "whatsapp" && !whatsAppUrl} className={`${buttonPrimary} sm:min-w-[260px]`}>
+              {pending === "whatsapp" && !whatsAppUrl ? (
+                <CircleNotch weight="bold" className="size-5 motion-safe:animate-spin" aria-hidden />
+              ) : (
+                <WhatsappLogo weight="bold" className="size-5" aria-hidden />
+              )}
+              {pending === "whatsapp" && !whatsAppUrl ? "Abriendo WhatsApp" : "Enviar pedido por WhatsApp"}
+            </button>
+          )}
         </div>
-        {!openpayEnabled && (
-          <p className="text-[13px] text-muted">El pago con tarjeta no está disponible por ahora. Envía tu pedido por WhatsApp.</p>
-        )}
         {message && (
           <p role="alert" className="flex items-start gap-2 text-sm font-medium text-[#B42318]">
             <WarningCircle weight="bold" className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -301,12 +353,16 @@ export function CheckoutForm({
           </p>
         )}
         <div className="border-t border-line pt-4 text-[15px]">
-          <button type="button" onClick={sendWhatsApp} className={`${textLink} inline-flex items-center gap-1.5`}>
-            <WhatsappLogo weight="bold" className="size-4" aria-hidden />
-            ¿Prefieres pagar por WhatsApp?
-          </button>
-          <p className="mt-1 text-[13px] text-muted">Te enviamos los datos para pagar por transferencia bancaria.</p>
-          {pending === "whatsapp" && (
+          {openpayEnabled && (
+            <button type="button" onClick={() => void sendWhatsApp()} className={`${textLink} inline-flex items-center gap-1.5`}>
+              <WhatsappLogo weight="bold" className="size-4" aria-hidden />
+              ¿Prefieres pagar por WhatsApp?
+            </button>
+          )}
+          <p className={openpayEnabled ? "mt-1 text-[13px] text-muted" : "text-[13px] text-muted"}>
+            Te enviamos los datos para pagar por transferencia bancaria.
+          </p>
+          {pending === "whatsapp" && whatsAppUrl && (
             <p role="status" className="mt-3 text-sm">
               Tu navegador bloqueó la ventana nueva.{" "}
               <a href={whatsAppUrl} target="_blank" rel="noopener noreferrer" className={textLink}>

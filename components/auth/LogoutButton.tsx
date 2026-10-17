@@ -5,7 +5,7 @@ import { useState } from "react";
 import { SignOut } from "@phosphor-icons/react";
 import { buttonSecondary } from "@/lib/ui";
 
-export function LogoutButton() {
+export function LogoutButton({ className = "" }: { className?: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -20,7 +20,7 @@ export function LogoutButton() {
   }
 
   return (
-    <button type="button" onClick={logout} disabled={pending} className={buttonSecondary}>
+    <button type="button" onClick={logout} disabled={pending} className={`${buttonSecondary} ${className}`}>
       <SignOut weight="bold" className="size-4" aria-hidden />
       Cerrar sesión
     </button>

@@ -1,7 +1,8 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { connection } from "next/server";
-import { ArrowRight, CreditCard, ForkKnife, Package } from "@phosphor-icons/react/dist/ssr";
+import { ArrowRight, CreditCard, ForkKnife, Package, WhatsappLogo } from "@phosphor-icons/react/dist/ssr";
 import { PackageCards } from "@/components/PackageCards";
 import { Reveal } from "@/components/Reveal";
 import { MapTeaser } from "@/components/map/MapTeaser";
@@ -10,20 +11,30 @@ import { getCatalog } from "@/lib/catalog";
 import { menuCards } from "@/lib/catalog/menu";
 import type { MealPackage } from "@/lib/catalog/types";
 import { formatCents } from "@/lib/format";
+import { isOpenpayConfigured } from "@/lib/openpay";
 import { buttonPrimary, buttonSecondary, container, textLink } from "@/lib/ui";
+
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    description: isOpenpayConfigured()
+      ? "Meal prep alto en proteína en Tijuana. Arma tus platillos o elige un paquete y paga con tarjeta en línea."
+      : "Meal prep alto en proteína en Tijuana. Arma tus platillos o elige un paquete y pide por WhatsApp.",
+  };
+}
 
 export default async function Home() {
   await connection();
   const catalog = await getCatalog();
+  const openpayEnabled = isOpenpayConfigured();
 
   return (
     <>
       <Hero />
-      <HowItWorks />
+      <HowItWorks openpayEnabled={openpayEnabled} />
       <MenuRow items={menuCards(catalog)} />
       {catalog.packages.length > 0 && <PackagesSection packages={catalog.packages} />}
       <MapTeaser />
-      <ClosingBand />
+      <ClosingBand openpayEnabled={openpayEnabled} />
     </>
   );
 }
@@ -83,7 +94,7 @@ function Hero() {
   );
 }
 
-function HowItWorks() {
+function HowItWorks({ openpayEnabled }: { openpayEnabled: boolean }) {
   return (
     <section className="border-t border-line bg-cream py-24 md:py-32">
       <div className={container}>
@@ -116,11 +127,19 @@ function HowItWorks() {
 
           <Reveal delay={0.08}>
             <article className="flex h-full flex-col justify-between gap-10 rounded-frame border border-line-strong bg-paper p-8">
-              <CreditCard weight="bold" className="size-7 text-ink" aria-hidden />
+              {openpayEnabled ? (
+                <CreditCard weight="bold" className="size-7 text-ink" aria-hidden />
+              ) : (
+                <WhatsappLogo weight="bold" className="size-7 text-ink" aria-hidden />
+              )}
               <div>
-                <h3 className="font-display text-2xl font-extrabold tracking-tight">Paga en línea</h3>
+                <h3 className="font-display text-2xl font-extrabold tracking-tight">
+                  {openpayEnabled ? "Paga en línea" : "Pide por WhatsApp"}
+                </h3>
                 <p className="mt-2 text-[15px] leading-relaxed text-muted">
-                  Pagas con tarjeta en la página segura de Openpay. ¿Prefieres transferencia? Pide por WhatsApp.
+                  {openpayEnabled
+                    ? "Pagas con tarjeta en la página segura de Openpay. ¿Prefieres transferencia? Pide por WhatsApp."
+                    : "Envía tu pedido y te compartimos los datos para pagar por transferencia."}
                 </p>
               </div>
             </article>
@@ -132,7 +151,9 @@ function HowItWorks() {
               <div>
                 <h3 className="font-display text-2xl font-extrabold tracking-tight">Recibe tu semana</h3>
                 <p className="mt-2 text-[15px] leading-relaxed text-cream/75">
-                  Con tu pago confirmado, agendamos la entrega en tu zona o la recolección en un punto.
+                  {openpayEnabled
+                    ? "Con tu pago confirmado, agendamos la entrega en tu zona o la recolección en un punto."
+                    : "Te confirmamos la entrega en tu zona o la recolección en un punto."}
                 </p>
               </div>
             </article>
@@ -203,7 +224,7 @@ function PackagesSection({ packages }: { packages: MealPackage[] }) {
   );
 }
 
-function ClosingBand() {
+function ClosingBand({ openpayEnabled }: { openpayEnabled: boolean }) {
   return (
     <section className="border-t border-line bg-cream py-24 md:py-36">
       <div className={`${container} flex flex-col items-center text-center`}>
@@ -214,7 +235,9 @@ function ClosingBand() {
         </Reveal>
         <Reveal delay={0.1}>
           <p className="mt-6 max-w-[48ch] text-lg leading-relaxed text-muted">
-            Paga con tarjeta en Openpay, o envíalo por WhatsApp y paga por transferencia.
+            {openpayEnabled
+              ? "Paga con tarjeta en Openpay, o envíalo por WhatsApp y paga por transferencia."
+              : "Envíalo por WhatsApp y paga por transferencia."}
           </p>
         </Reveal>
         <Reveal delay={0.18}>

@@ -7,13 +7,18 @@ import { PackageCards } from "@/components/PackageCards";
 import { Reveal } from "@/components/Reveal";
 import { getCatalog } from "@/lib/catalog";
 import { menuCards } from "@/lib/catalog/menu";
+import { isOpenpayConfigured } from "@/lib/openpay";
 import { buttonPrimary, container } from "@/lib/ui";
 
-export const metadata: Metadata = {
-  title: "Menú y precios",
-  description:
-    "Platillos de meal prep en Regular y Plus, paquetes POWER Chicken y POWER Mix. Arma tu platillo y paga en línea. Precios en MXN.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const card = isOpenpayConfigured();
+  return {
+    title: "Menú y precios",
+    description: card
+      ? "Platillos de meal prep en Regular y Plus, paquetes POWER Chicken y POWER Mix. Arma tu platillo y paga en línea. Precios en MXN."
+      : "Platillos de meal prep en Regular y Plus, paquetes POWER Chicken y POWER Mix. Arma tu platillo y pide por WhatsApp. Precios en MXN.",
+  };
+}
 
 export default async function MenuPage() {
   await connection();
@@ -59,7 +64,9 @@ export default async function MenuPage() {
           <div>
             <h2 className="font-display text-3xl font-extrabold tracking-tight md:text-4xl">Arma tu propio platillo</h2>
             <p className="mt-3 max-w-[50ch] text-[16px] leading-relaxed text-muted">
-              Elige proteína, base, tamaño y estilo. Pagas con tarjeta en Openpay o por WhatsApp.
+              {isOpenpayConfigured()
+                ? "Elige proteína, base, tamaño y estilo. Pagas con tarjeta en Openpay o por WhatsApp."
+                : "Elige proteína, base, tamaño y estilo. Envía tu pedido por WhatsApp y paga por transferencia."}
             </p>
           </div>
           <Link href="/pedido" className={buttonPrimary}>

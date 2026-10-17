@@ -15,6 +15,7 @@ export const metadata: Metadata = {
 
 const statusLabels: Record<(typeof schema.orderStatus.enumValues)[number], string> = {
   pending_payment: "Pendiente de pago",
+  ordered_whatsapp: "Pedido por WhatsApp",
   paid: "Pagado",
   confirmed: "Confirmado",
   preparing: "En preparación",
@@ -53,7 +54,7 @@ export default async function HistorialPage() {
             <div className="mt-10 rounded-frame border border-line-strong bg-paper p-6 sm:p-8">
               <p className="text-lg font-semibold text-ink">Aún no tienes pedidos en tu cuenta.</p>
               <p className="mt-2 text-[15px] leading-relaxed text-muted">
-                Los pedidos que pagues con tu cuenta aparecerán aquí para que puedas repetirlos.
+                Los pedidos que envíes por WhatsApp con tu cuenta, o que pagues, aparecerán aquí para que puedas repetirlos.
               </p>
               <Link href="/pedido" className={`${buttonPrimary} mt-6`}>
                 Hacer un pedido

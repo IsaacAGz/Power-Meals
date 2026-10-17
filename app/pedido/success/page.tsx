@@ -36,6 +36,7 @@ export default async function PedidoSuccessPage({ searchParams }: PageProps<"/pe
   if (receipt.status === "failed") redirect(receiptPath(ref, "cancel"));
 
   const paid = receipt.status === "paid";
+  const whatsApp = receipt.status === "whatsapp";
   const user = await getCurrentUser();
   const ownedByViewer = user !== null && receipt.ownerUserId === user.id;
   const isGuestOrder = receipt.ownerUserId === null;
@@ -48,19 +49,21 @@ export default async function PedidoSuccessPage({ searchParams }: PageProps<"/pe
       <div className={container}>
         <div className="mx-auto flex max-w-[760px] flex-col gap-10">
           <header>
-            {paid && <CheckCircle weight="bold" className="size-10 text-ink" aria-hidden />}
+            {(paid || whatsApp) && <CheckCircle weight="bold" className="size-10 text-ink" aria-hidden />}
             <h1 className="mt-5 font-display text-5xl leading-[1] font-extrabold tracking-[-0.03em] md:text-6xl">
-              {paid ? `¡Gracias, ${firstName}!` : "Recibimos tu pedido"}
+              {paid || whatsApp ? `¡Gracias, ${firstName}!` : "Recibimos tu pedido"}
             </h1>
             <p className="mt-5 text-lg leading-relaxed text-muted">
               Pedido <span className="font-mono text-ink">#{receipt.orderNumber}</span>
               {paid
                 ? ". Tu pago está confirmado; te contactamos para coordinar la entrega."
-                : ". En cuanto Openpay confirme el pago, lo verás aquí."}
+                : whatsApp
+                  ? ". Quedó guardado como pedido por WhatsApp. El pago por transferencia sigue pendiente."
+                  : ". En cuanto Openpay confirme el pago, lo verás aquí."}
             </p>
           </header>
 
-          {!paid && <PaymentStatusPoller orderRef={ref} cancelPath={receiptPath(ref, "cancel")} />}
+          {!paid && !whatsApp && <PaymentStatusPoller orderRef={ref} cancelPath={receiptPath(ref, "cancel")} />}
 
           <ReceiptSummary receipt={receipt} />
 
@@ -92,7 +95,7 @@ export default async function PedidoSuccessPage({ searchParams }: PageProps<"/pe
                 Ver menú
               </Link>
             )}
-            {!paid && (
+            {!paid && !whatsApp && (
               <p className="self-center text-[15px] text-muted">
                 ¿Problemas con el pago?{" "}
                 <Link href="/pedido" className={textLink}>

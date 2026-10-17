@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
+import { ConditionalFooter } from "@/components/ConditionalFooter";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import "./globals.css";
@@ -31,7 +32,7 @@ export const metadata: Metadata = {
     template: "%s | Power Meals",
   },
   description:
-    "Meal prep alto en proteína en Tijuana. Arma tus platillos o elige un paquete y paga con tarjeta en línea.",
+    "Meal prep alto en proteína en Tijuana. Arma tus platillos o elige un paquete y pide por WhatsApp.",
   openGraph: {
     locale: "es_MX",
     siteName: "Power Meals",
@@ -58,7 +59,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <main id="contenido" className="flex-1">
           {children}
         </main>
-        <Footer />
+        <ConditionalFooter>
+          <Footer />
+        </ConditionalFooter>
       </body>
     </html>
   );
