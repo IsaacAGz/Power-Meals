@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "@phosphor-icons/react";
-import { pickupPoints } from "@/lib/locations-data";
+import { mapPins } from "@/lib/locations-data";
 import { buttonDark, container } from "@/lib/ui";
 
 const BrandMap = dynamic(() => import("./BrandMap"), {
@@ -55,7 +55,7 @@ export function MapTeaser() {
               Recoge en Tijuana
             </h2>
             <p className="mt-3 text-[15px] leading-relaxed text-muted">
-              {pickupPoints.map((point) => point.name).join(", ")}.
+              {mapPins.map((pin) => pin.name).join(", ")}.
             </p>
             <Link href="/ubicaciones" className={`${buttonDark} mt-6`}>
               Ver puntos

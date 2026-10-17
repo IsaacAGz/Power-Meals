@@ -2,6 +2,7 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { clearGuestCart, clearUserCart } from "@/lib/cart";
 import { getDb, schema, type Database } from "@/lib/db";
+import { queueKitchenTicket, sendKitchenTicket } from "@/lib/kitchen/dispatch";
 import type { Charge } from "@/lib/openpay";
 import { getRedis } from "@/lib/redis";
 
@@ -29,6 +30,7 @@ async function lockOrder(tx: Tx, ref: string | null) {
       status: schema.orders.status,
       totalCents: schema.orders.totalCents,
       userId: schema.orders.userId,
+      kitchenFacilityId: schema.orders.kitchenFacilityId,
     })
     .from(schema.orders)
     .where(eq(schema.orders.publicOrderRef, ref))
@@ -50,7 +52,7 @@ async function logEvent(tx: Tx, event: WebhookEvent, orderId: string | null, out
 
 /**
  * First success moves the order to paid, records the charge, and clears the cart. Any later success for an
- * order that is already paid is logged as a duplicate with no side effects (no status change, no dispatch).
+ * order that is already paid is logged as a duplicate with no side effects (no status change, no ticket).
  */
 export async function recordChargeSucceeded(charge: Charge, event: WebhookEvent): Promise<PaymentOutcome> {
   const outcome = await getDb().transaction(async (tx) => {
@@ -73,15 +75,20 @@ export async function recordChargeSucceeded(charge: Charge, event: WebhookEvent)
       .set({ status: "succeeded", openpayChargeId: charge.id })
       .where(eq(schema.payments.orderId, order.id));
     if (order.userId) await clearUserCart(tx, order.userId);
-    return logEvent(tx, event, order.id, "paid");
+    await queueKitchenTicket(tx, order.id, order.kitchenFacilityId);
+    await logEvent(tx, event, order.id, "paid");
+    return { outcome: "paid" as const, orderId: order.id };
   });
 
-  if (outcome === "paid" && charge.orderId) {
+  if (typeof outcome === "string") return outcome;
+
+  if (charge.orderId) {
     const redis = getRedis();
     const sessionId = await redis.get(checkoutCartKey(charge.orderId));
     if (sessionId) await Promise.all([clearGuestCart(sessionId), redis.del(checkoutCartKey(charge.orderId))]);
   }
-  return outcome;
+  await sendKitchenTicket(outcome.orderId);
+  return outcome.outcome;
 }
 
 /** A failed or cancelled charge closes a still-pending order; the customer's cart is left intact to retry. */

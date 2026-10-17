@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight, Lightning, MapPin } from "@phosphor-icons/react";
-import { pickupPoints } from "@/lib/locations-data";
+import { mapPins } from "@/lib/locations-data";
 
 const BrandMap = dynamic(() => import("./BrandMap"), {
   ssr: false,
@@ -39,9 +39,9 @@ export function LocationsExplorer() {
       </div>
 
       <div>
-        <h2 className="font-display text-2xl font-extrabold tracking-tight">Puntos de recolección</h2>
+        <h2 className="font-display text-2xl font-extrabold tracking-tight">Cocinas</h2>
         <ul className="mt-5 flex flex-col gap-2">
-          {pickupPoints.map((point) => {
+          {mapPins.map((point) => {
             const active = point.slug === selected;
             return (
               <li key={point.slug}>
@@ -61,18 +61,20 @@ export function LocationsExplorer() {
                     </span>
                     <span>
                       <span className="block font-display text-xl font-bold tracking-tight">{point.name}</span>
-                      <span className="mt-1 flex items-center gap-1 text-sm text-muted">
-                        <MapPin weight="bold" className="size-3.5" aria-hidden />
-                        {point.address}
-                      </span>
-                      <span className="mt-1 block text-[13px] text-muted">{point.hours}</span>
+                      {point.address ? (
+                        <span className="mt-1 flex items-center gap-1 text-sm text-muted">
+                          <MapPin weight="bold" className="size-3.5" aria-hidden />
+                          {point.address}
+                        </span>
+                      ) : null}
+                      {point.hours ? <span className="mt-1 block text-[13px] text-muted">{point.hours}</span> : null}
                     </span>
                   </button>
                   <Link
-                    href={`/pedido?punto=${point.slug}`}
+                    href="/pedido"
                     className="group mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-ink underline decoration-power decoration-2 underline-offset-4 hover:decoration-ink"
                   >
-                    Recoger en este punto
+                    Hacer un pedido
                     <ArrowRight weight="bold" className="size-3.5 transition-transform group-hover:translate-x-0.5" />
                   </Link>
                 </div>

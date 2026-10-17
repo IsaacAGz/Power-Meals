@@ -22,8 +22,8 @@ Related: [power-meals-v2.md](./power-meals-v2.md) (engineering brief), [power-me
   - [x] **Copy while Openpay is off:** home, `/menu`, footer, and `/pedido` follow `isOpenpayConfigured()` and describe WhatsApp + transferencia; they do not promise card payment
 - [ ] **Phase 2b — Openpay activation (deferred):** sandbox merchant id + private key, webhook user/password, one real sandbox payment, then restore the card-payment copy (see [Phase 2b](#phase-2b--openpay-activation-deferred))
 - [x] **Phase 2c — WhatsApp order ingestion:** store the order only for a logged-in user, or when that guest logs in afterward; status `ordered_whatsapp`, never `paid` (see [Phase 2c](#phase-2c--whatsapp-order-ingestion))
-- [ ] **Phase 3:** Single SQS queue + `kitchen_facility_id` attributes, print-daemon filter per LAN facility
-  - [ ] Print failures: no delete, `ChangeMessageVisibility` backoff (60–300s), non-blocking poll loop
+- [x] **Phase 3:** Single SQS queue + `kitchen_facility_id` attributes, print-daemon filter per LAN facility (see [Phase 3 status](#phase-3--kitchen-dispatch-sqs--receipt-contract))
+  - [x] Print failures: no delete, `ChangeMessageVisibility` backoff (60–300s), non-blocking poll loop
 - [x] **Phase 4:** `/kitchen/dashboard` with 10s polling, facility-scoped orders and status lifecycle (see [Phase 4 status](#phase-4--kitchen-staff-dashboard))
 - [ ] **Phase 5:** Openpay prod toggle (after Phase 2b) + powermeals.mx webhook, EC2 stability gate, sunset Cloudflare static
 
@@ -593,6 +593,10 @@ Implement migration in `lib/cart/` (called from auth and account-link flows in P
 
 **Exit criteria:** Sandbox order prints at one kitchen; simulated print failure leaves message on queue, visibility resets after backoff, successful retry deletes message; poll loop continues processing other messages; DLQ documented.
 
+**Status:** Implemented and verified against a local SQS stand-in, not a real AWS queue yet. The first transition to `paid` (dashboard transfer confirmation, or Openpay first success) writes a `kitchen_dispatches` outbox row in the same transaction ([`lib/kitchen/dispatch.ts`](./lib/kitchen/dispatch.ts)). The app sends it after responding; `power-meals-dispatch.timer` retries anything still `pending`. With no `SQS_QUEUE_URL` the row is `skipped`, so enabling the queue later doesn't print old orders. [`packages/print-daemon`](./packages/print-daemon/README.md) prints for its own `KITCHEN_FACILITY_ID`, backs off 120 → 240 → 300 s on printer failure without blocking the poll loop, skips duplicate deliveries, and hands other kitchens' tickets back after 5 s. Queue, DLQ, and IAM setup are in [`docs/ec2-setup.md`](./docs/ec2-setup.md#kitchen-printing-sqs). The Openpay path compiles and shares the outbox, but needs Phase 2b to be exercised end to end.
+
+- **Shared-queue trade-off:** SQS can't filter on receive, so every daemon receives every kitchen's tickets. Each hand-back counts toward `maxReceiveCount` (set to 1000) and can delay a ticket by a few seconds. If one kitchen's PC is off while the others run, its tickets can reach the DLQ in under an hour. Per-facility queues (or SNS with filter policies) would remove this if it becomes a problem.
+
 ---
 
 ## Phase 4 — Kitchen staff dashboard
@@ -611,7 +615,7 @@ Implement migration in `lib/cart/` (called from auth and account-link flows in P
 
 **Exit criteria:** Status changes persist; retail `/historial` reflects status; only assigned facility orders visible.
 
-**Status:** Implemented. [`app/kitchen/dashboard/page.tsx`](./app/kitchen/dashboard/page.tsx) lists one kitchen's orders in the five columns. Confirming a transfer sets `ordered_whatsapp` → `paid` (`paid_at` set, payment `succeeded`) and writes `order_status_events`. Later steps are `paid` → `preparing` → `ready` → `completed`. The board polls `GET /api/kitchen/orders` every 10 seconds and pauses while the tab is hidden. SQS publish on that first `paid` transition is still Phase 3; the transition logs `kitchen.order_paid` so the publisher has one place to hook.
+**Status:** Implemented. [`app/kitchen/dashboard/page.tsx`](./app/kitchen/dashboard/page.tsx) lists one kitchen's orders in the five columns. Confirming a transfer sets `ordered_whatsapp` → `paid` (`paid_at` set, payment `succeeded`) and writes `order_status_events`. Later steps are `paid` → `preparing` → `ready` → `completed`. The board polls `GET /api/kitchen/orders` every 10 seconds and pauses while the tab is hidden. Since Phase 3, that first `paid` transition also queues the kitchen ticket.
 
 ---
 

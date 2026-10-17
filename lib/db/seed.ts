@@ -1,24 +1,15 @@
 import { inArray, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { baseSeed, filterSeed, packageSeed, portionSeed, proteinSeed, templateSeed } from "../catalog/seed-data";
+import { kitchenLocations } from "../kitchens";
 import { pickupPoints as staticPickupPoints, zones as staticZones } from "../locations-data";
 import * as schema from "./schema";
 
 type SeedDatabase = PgDatabase<PgQueryResultHKT, typeof schema>;
 
-export const kitchenFacilitySeed = [
-  { slug: "zona-rio", name: "Zona Río", latitude: 32.52820512415235, longitude: -117.01893541543576 },
-  { slug: "otay", name: "Otay", latitude: 32.53809645350098, longitude: -116.92983513766147 },
-  { slug: "plaza-monarca", name: "Plaza Monarca", latitude: 32.500821014237935, longitude: -116.92067276725912 },
-  {
-    slug: "rio-tijuana-3ra-etapa",
-    name: "Rio Tijuana 3ra Etapa",
-    latitude: 32.497178312977205,
-    longitude: -116.93127319919203,
-  },
-] as const;
+export const kitchenFacilitySeed = kitchenLocations;
 
-type FacilitySlug = (typeof kitchenFacilitySeed)[number]["slug"];
+type FacilitySlug = (typeof kitchenLocations)[number]["slug"];
 
 // Initial routing only; ops can reassign rows in the database without a deploy.
 const zoneFacility: Record<string, FacilitySlug> = {

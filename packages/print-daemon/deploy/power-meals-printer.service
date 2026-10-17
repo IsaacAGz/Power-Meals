@@ -1,0 +1,18 @@
+[Unit]
+Description=Power Meals kitchen print daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=powermeals-printer
+WorkingDirectory=/opt/power-meals-printer
+EnvironmentFile=/opt/power-meals-printer/.env
+ExecStart=/usr/bin/node src/daemon.ts
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

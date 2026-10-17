@@ -1,0 +1,17 @@
+{
+  "name": "@power-meals/print-daemon",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/daemon.ts",
+    "test-print": "node --env-file-if-exists=.env src/test-print.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.1152.0"
+  }
+}

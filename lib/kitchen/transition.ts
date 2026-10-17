@@ -1,11 +1,15 @@
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import { getDb, schema, type Database } from "@/lib/db";
+import { queueKitchenTicket } from "./dispatch";
 import { KITCHEN_STATUSES, nextKitchenStep, type KitchenStatus } from "./types";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 export type TransitionResult = { ok: true; status: KitchenStatus } | { ok: false; message: string };
+
+/** `becamePaid` is true only for the call that made the first paid transition; send its ticket afterwards. */
+export type AdvanceOutcome = { ok: true; status: KitchenStatus; becamePaid: boolean } | { ok: false; message: string };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -15,15 +19,14 @@ function isKitchenStatus(value: string): value is KitchenStatus {
 
 /**
  * Moves one order a single step, and only if it belongs to this kitchen and is still in `fromStatus`.
- * ordered_whatsapp → paid is the transfer confirmation. Phase 3 publishes to the kitchen queue from that
- * commit; this function only records the transition.
+ * ordered_whatsapp → paid is the transfer confirmation, and its kitchen ticket is queued in the same commit.
  */
 export async function advanceKitchenOrderStatus(
   facilityId: string,
   staffUserId: string,
   orderId: string,
   fromStatus: KitchenStatus,
-): Promise<TransitionResult> {
+): Promise<AdvanceOutcome> {
   const step = nextKitchenStep[fromStatus];
   if (!step || !UUID_PATTERN.test(orderId)) return { ok: false, message: "Ese cambio no está permitido." };
 
@@ -52,6 +55,7 @@ export async function advanceKitchenOrderStatus(
         .update(schema.payments)
         .set({ status: "succeeded" })
         .where(and(eq(schema.payments.orderId, order.id), eq(schema.payments.status, "pending")));
+      await queueKitchenTicket(tx, order.id, order.kitchenFacilityId);
     }
     return { ok: true as const, status: to, becamePaid: to === "paid" };
   });
@@ -59,7 +63,7 @@ export async function advanceKitchenOrderStatus(
   if (outcome.ok && outcome.becamePaid) {
     console.info(JSON.stringify({ event: "kitchen.order_paid", orderId, facilityId }));
   }
-  return outcome.ok ? { ok: true, status: outcome.status } : outcome;
+  return outcome;
 }
 
 async function lockOrder(tx: Tx, orderId: string) {

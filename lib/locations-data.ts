@@ -1,4 +1,5 @@
-// Placeholder coverage: delivery zones for the order form, and drop-off points for the map.
+// Delivery zones and pickup points feed checkout. The map pins are the kitchens.
+import { kitchenLocations } from "./kitchens";
 
 export type LngLat = [number, number];
 
@@ -16,8 +17,17 @@ export type PickupPoint = {
   coordinates: LngLat;
 };
 
-export const MAP_CENTER: LngLat = [-117.038, 32.515];
+export const MAP_CENTER: LngLat = [-116.97, 32.518];
 export const MAP_ZOOM = 11;
+
+/** Pins on /ubicaciones and the home map. Checkout pickup points stay separate. */
+export const mapPins: PickupPoint[] = kitchenLocations.map((kitchen) => ({
+  slug: kitchen.slug,
+  name: kitchen.name,
+  address: "",
+  hours: "",
+  coordinates: [kitchen.longitude, kitchen.latitude],
+}));
 
 export const zones: Zone[] = [
   { slug: "zona-rio", name: "Zona Río", days: "Lunes, miércoles y viernes" },
@@ -54,9 +64,14 @@ export function getPickupPoint(slug: string | undefined | null) {
   return pickupPoints.find((point) => point.slug === slug);
 }
 
+export function getMapPin(slug: string | undefined | null) {
+  if (!slug) return undefined;
+  return mapPins.find((pin) => pin.slug === slug);
+}
+
 export function pointsBounds(): [LngLat, LngLat] {
-  const lngs = pickupPoints.map((point) => point.coordinates[0]);
-  const lats = pickupPoints.map((point) => point.coordinates[1]);
+  const lngs = mapPins.map((pin) => pin.coordinates[0]);
+  const lats = mapPins.map((pin) => pin.coordinates[1]);
   const minLng = Math.min(...lngs);
   const maxLng = Math.max(...lngs);
   const minLat = Math.min(...lats);

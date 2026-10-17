@@ -1,4 +1,4 @@
-import { pickupPoints, pointsBounds, type LngLat } from "@/lib/locations-data";
+import { mapPins, pointsBounds, type LngLat } from "@/lib/locations-data";
 
 const WIDTH = 1000;
 
@@ -17,10 +17,10 @@ export function ZonesSketch({ showPickupPoints = true, className = "" }: { showP
       viewBox={`${-pad} ${-pad} ${WIDTH + pad * 2} ${height + pad * 2}`}
       className={className}
       role="img"
-      aria-label={`Puntos de recolección: ${pickupPoints.map((point) => point.name).join(", ")}`}
+      aria-label={`Cocinas: ${mapPins.map((pin) => pin.name).join(", ")}`}
     >
       {showPickupPoints &&
-        pickupPoints.map((point) => {
+        mapPins.map((point) => {
           const [x, y] = project(point.coordinates);
           return (
             <g key={point.slug}>

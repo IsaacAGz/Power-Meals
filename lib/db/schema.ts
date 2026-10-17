@@ -379,6 +379,35 @@ export const openpayWebhookEvents = pgTable(
   ],
 );
 
+/**
+ * Outbox for kitchen tickets. Written in the same transaction as the first transition to paid, so a ticket
+ * cannot be lost between the commit and the SQS send; one row per order keeps replays from printing twice.
+ */
+export const kitchenDispatches = pgTable(
+  "kitchen_dispatches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .unique()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    kitchenFacilityId: uuid("kitchen_facility_id")
+      .notNull()
+      .references(() => kitchenFacilities.id),
+    // pending -> sent; failed after too many attempts; skipped when SQS is not configured.
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    sqsMessageId: text("sqs_message_id"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("kitchen_dispatches_pending_idx").on(table.createdAt).where(sql`${table.status} = 'pending'`),
+    check("kitchen_dispatches_status", sql`${table.status} IN ('pending', 'sent', 'failed', 'skipped')`),
+  ],
+);
+
 /** Logged-in working cart. Same item shape as the guest Redis cart; prices are re-resolved at checkout. */
 export const cartLineItems = pgTable(
   "cart_line_items",

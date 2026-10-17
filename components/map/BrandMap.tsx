@@ -7,7 +7,7 @@ import { useReducedMotion } from "motion/react";
 import { Lightning } from "@phosphor-icons/react";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { applyBrandStyle, mapTilerStyleUrl } from "@/lib/map-style";
-import { getPickupPoint, MAP_CENTER, MAP_ZOOM, pickupPoints, pointsBounds } from "@/lib/locations-data";
+import { getMapPin, MAP_CENTER, MAP_ZOOM, mapPins, pointsBounds } from "@/lib/locations-data";
 import { buildWhatsAppUrl, PICKUP_QUESTION_MESSAGE } from "@/lib/whatsapp";
 import { ZonesSketch } from "./ZonesSketch";
 
@@ -104,12 +104,12 @@ export default function BrandMap({
       });
 
       if (showPickupPoints) {
-        for (const point of pickupPoints) {
+        for (const point of mapPins) {
           const element = document.createElement("button");
           element.type = "button";
           element.className =
             "flex size-9 cursor-pointer items-center justify-center rounded-[12px] border-0 bg-ink p-0 text-power ring-2 ring-cream";
-          element.setAttribute("aria-label", `Punto de recolección: ${point.name}`);
+          element.setAttribute("aria-label", `Cocina: ${point.name}`);
           if (selectedRef.current === point.slug) element.classList.replace("ring-cream", "ring-power");
           element.addEventListener("click", () => onPointClickRef.current?.(point.slug));
           const root = createRoot(element);
@@ -121,13 +121,19 @@ export default function BrandMap({
           const title = document.createElement("strong");
           title.textContent = point.name;
           title.className = "block font-semibold";
-          const address = document.createElement("span");
-          address.textContent = point.address;
-          address.className = "block text-muted";
-          const hours = document.createElement("span");
-          hours.textContent = point.hours;
-          hours.className = "mt-1 block text-[12px] text-muted";
-          popupBody.append(title, address, hours);
+          popupBody.append(title);
+          if (point.address) {
+            const address = document.createElement("span");
+            address.textContent = point.address;
+            address.className = "block text-muted";
+            popupBody.append(address);
+          }
+          if (point.hours) {
+            const hours = document.createElement("span");
+            hours.textContent = point.hours;
+            hours.className = "mt-1 block text-[12px] text-muted";
+            popupBody.append(hours);
+          }
 
           const marker = new maplibregl.Marker({ element, anchor: "center" })
             .setLngLat(point.coordinates)
@@ -166,7 +172,7 @@ export default function BrandMap({
     });
     if (!map || status !== "ready") return;
 
-    const point = getPickupPoint(selectedPoint);
+    const point = getMapPin(selectedPoint);
     if (!point) return;
     const camera = { center: point.coordinates, zoom: 14 };
     if (reduce) map.jumpTo(camera);
@@ -175,7 +181,7 @@ export default function BrandMap({
 
   return (
     <div className={`absolute inset-0 overflow-hidden rounded-frame bg-cream ${className}`}>
-      <div ref={containerRef} className="size-full" aria-label="Mapa de puntos de recolección en Tijuana" />
+      <div ref={containerRef} className="size-full" aria-label="Mapa de cocinas en Tijuana" />
 
       {status === "loading" && (
         <div aria-hidden className="absolute inset-0 bg-[#EFEADF] motion-safe:animate-pulse" />
@@ -212,7 +218,7 @@ function MapFallback({
       {!quiet && (
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 border-t border-line bg-cream/80 p-6">
           <p className="max-w-[48ch] text-[15px] leading-relaxed text-muted">
-            El mapa interactivo no está disponible en este momento. Estos son nuestros puntos de recolección.
+            El mapa interactivo no está disponible en este momento. Estas son nuestras cocinas.
           </p>
           <a
             href={buildWhatsAppUrl(PICKUP_QUESTION_MESSAGE)}
