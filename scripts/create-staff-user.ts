@@ -36,6 +36,7 @@ async function main() {
       email,
       name,
       passwordHash: await hashPassword(password),
+      emailVerifiedAt: new Date(),
       role: "kitchen_staff",
       kitchenFacilityId: facility.id,
     })

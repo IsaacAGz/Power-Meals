@@ -44,6 +44,8 @@ The account phases and the pedido phases do not depend on each other. Accounts p
 
 **Exit criteria:** A new registration does not create a session. Login with the right password before the link is opened is refused. Opening the link signs them in, and a second login works. An account that already existed can still sign in. With SES unset, no user row is inserted.
 
+**Status:** Done. Existing accounts were backfilled. A new registration does not sign anyone in, login before the link is refused, and opening the link lands on `/cuenta`. A failed confirmation send does not keep the new user.
+
 ### Accounts 2 — Turnstile on registration
 
 **Goal:** `/registro` rejects a submit that did not pass Cloudflare Turnstile.
@@ -56,6 +58,8 @@ The account phases and the pedido phases do not depend on each other. Accounts p
 
 **Exit criteria:** Registration without a valid token does not create a user. A token Cloudflare accepts continues into the confirmation email.
 
+**Status:** Done. A missing or rejected token is refused and no user is created. A token Cloudflare accepts continues into the confirmation email.
+
 ### Accounts 3 — Reset the password
 
 **Goal:** Anyone with the account email can set a new password from a link, and the request form requires Turnstile.
@@ -67,6 +71,8 @@ The account phases and the pedido phases do not depend on each other. Accounts p
 - [`/ingresar`](./app/ingresar/page.tsx) links to `/recuperar`.
 
 **Exit criteria:** Requesting a reset for a real account sends one email, and the same request for an unknown address shows the same sentence and sends nothing. The link sets a new password once. The old password then fails, and the new one signs them in. A request without a valid Turnstile token sends nothing.
+
+**Status:** Done. A request without Turnstile sends nothing. A known address and an unknown address get the same sentence. The link sets the password once and signs the person in; the old password then fails.
 
 After Accounts 3, update [`.cursor/rules/application.mdc`](./.cursor/rules/application.mdc) so later work treats public registration as unverified until the email link, Turnstile as the gate on registration and reset requests, and the email link as the only password reset.
 

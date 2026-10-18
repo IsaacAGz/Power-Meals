@@ -231,6 +231,8 @@ export const users = pgTable(
     phone: text("phone"),
     // PHC-format Argon2id string; embeds the per-user salt. The pepper never touches the database.
     passwordHash: text("password_hash").notNull(),
+    // Null until the person opens the confirmation link. Existing rows are backfilled so they can still sign in.
+    emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
     role: userRole("role").notNull().default("customer"),
     kitchenFacilityId: uuid("kitchen_facility_id").references(() => kitchenFacilities.id),
     ...timestamps,

@@ -2,7 +2,8 @@ import type { FieldErrors } from "./validation";
 
 export type AuthResponse =
   | { ok: true; redirectTo: string }
-  | { ok: false; message?: string; errors?: FieldErrors };
+  | { ok: true; checkEmail: true }
+  | { ok: false; message?: string; errors?: FieldErrors; unverified?: boolean };
 
 export function authError(status: number, body: Omit<Extract<AuthResponse, { ok: false }>, "ok">) {
   return Response.json({ ok: false, ...body } satisfies AuthResponse, { status });

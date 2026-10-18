@@ -23,6 +23,11 @@ export default async function IngresarPage({ searchParams }: PageProps<"/ingresa
     <AuthShell title="Inicia sesión" intro="Consulta tus pedidos y pide más rápido la próxima vez.">
       <AuthForm mode="login" next={nextPath || undefined} />
       <p className="mt-6 text-[15px] text-muted">
+        <Link href="/recuperar" className={textLink}>
+          ¿Olvidaste tu contraseña?
+        </Link>
+      </p>
+      <p className="mt-3 text-[15px] text-muted">
         ¿No tienes cuenta?{" "}
         <Link href={nextPath ? `/registro?next=${encodeURIComponent(nextPath)}` : "/registro"} className={textLink}>
           Crea una

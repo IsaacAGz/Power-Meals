@@ -2,11 +2,12 @@ import type { NextConfig } from "next";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://api.maptiler.com",
   "font-src 'self'",
-  "connect-src 'self' https://api.maptiler.com",
+  "connect-src 'self' https://api.maptiler.com https://challenges.cloudflare.com",
+  "frame-src https://challenges.cloudflare.com",
   "worker-src 'self' blob:",
   "frame-ancestors 'none'",
   "base-uri 'self'",

@@ -11,6 +11,11 @@ export function normalizeEmail(value: unknown): string {
   return text(value).trim().toLowerCase();
 }
 
+export function checkPassword(password: string): string | undefined {
+  if (password.length < PASSWORD_MIN_LENGTH) return `Usa al menos ${PASSWORD_MIN_LENGTH} caracteres.`;
+  if (password.length > PASSWORD_MAX_LENGTH) return `Usa máximo ${PASSWORD_MAX_LENGTH} caracteres.`;
+}
+
 function checkEmail(email: string): string | undefined {
   if (!EMAIL_PATTERN.test(email) || email.length > 254) return "Escribe un correo válido.";
 }
@@ -36,11 +41,8 @@ export function parseRegistration(body: Record<string, unknown>) {
   if (name.length < 2 || name.length > 80) errors.name = "Escribe tu nombre.";
   const emailError = checkEmail(email);
   if (emailError) errors.email = emailError;
-  if (password.length < PASSWORD_MIN_LENGTH) {
-    errors.password = `Usa al menos ${PASSWORD_MIN_LENGTH} caracteres.`;
-  } else if (password.length > PASSWORD_MAX_LENGTH) {
-    errors.password = `Usa máximo ${PASSWORD_MAX_LENGTH} caracteres.`;
-  }
+  const passwordError = checkPassword(password);
+  if (passwordError) errors.password = passwordError;
   if (phoneRaw && (phoneDigits.length < 10 || phoneDigits.length > 15)) {
     errors.phone = "Escribe un teléfono de al menos 10 dígitos.";
   }

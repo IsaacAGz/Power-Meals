@@ -1,10 +1,9 @@
-import { sql } from "drizzle-orm";
 import { homeFor } from "@/lib/auth/dal";
 import { verifyAgainstDummy, verifyPassword } from "@/lib/auth/password";
 import { authError, forbiddenOrigin, tooManyAttempts, type AuthResponse } from "@/lib/auth/responses";
 import { parseLogin, safeNextPath } from "@/lib/auth/validation";
+import { findUserByEmail } from "@/lib/auth/verify-email";
 import { migrateGuestCartToUser } from "@/lib/cart";
-import { getDb, schema } from "@/lib/db";
 import { claimWhatsAppOrder } from "@/lib/orders/whatsapp";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { clientIp, isSameOrigin, readJsonBody } from "@/lib/request";
@@ -27,14 +26,16 @@ export async function POST(request: Request) {
   const emailLimit = await hitRateLimit(`login:email:${data.email}`, 5, WINDOW_SECONDS);
   if (!emailLimit.allowed) return tooManyAttempts(emailLimit.retryAfterSeconds);
 
-  const [user] = await getDb()
-    .select({ id: schema.users.id, role: schema.users.role, passwordHash: schema.users.passwordHash })
-    .from(schema.users)
-    .where(sql`lower(${schema.users.email}) = ${data.email}`)
-    .limit(1);
+  const user = await findUserByEmail(data.email);
 
   const valid = user ? await verifyPassword(user.passwordHash, data.password) : await verifyAgainstDummy(data.password);
   if (!user || !valid) return authError(401, { message: "Correo o contraseña incorrectos." });
+  if (!user.emailVerifiedAt) {
+    return authError(403, {
+      message: "Confirma tu correo antes de iniciar sesión. Revisa tu bandeja o pide otro enlace.",
+      unverified: true,
+    });
+  }
 
   const guestSessionId = (await getSession())?.id;
   const session = await rotateSession({ userId: user.id });

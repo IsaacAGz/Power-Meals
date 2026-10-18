@@ -7,6 +7,7 @@ import { CircleNotch, WarningCircle } from "@phosphor-icons/react";
 import type { AuthResponse } from "@/lib/auth/responses";
 import { PASSWORD_MIN_LENGTH, type FieldErrors } from "@/lib/auth/validation";
 import { buttonPrimary, inputClass, textLink } from "@/lib/ui";
+import { TurnstileField, turnstileSiteKey } from "../auth/TurnstileField";
 import { FormField } from "../FormField";
 
 type Mode = "register" | "confirm";
@@ -44,15 +45,19 @@ export function LinkOrderPanel({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const [checkEmail, setCheckEmail] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileKey, setTurnstileKey] = useState(0);
+  const siteKey = turnstileSiteKey();
 
   async function link() {
     const result = await post("/api/auth/link-order", { orderRef, token });
-    if (result.ok) {
+    if (result.ok && "redirectTo" in result) {
       router.push(result.redirectTo);
       router.refresh();
       return true;
     }
-    setMessage(result.message ?? "No pudimos guardar el pedido.");
+    setMessage(!result.ok ? (result.message ?? "No pudimos guardar el pedido.") : "No pudimos guardar el pedido.");
     return false;
   }
 
@@ -63,14 +68,21 @@ export function LinkOrderPanel({
     setMessage("");
 
     const form = new FormData(event.currentTarget);
-    const registered = await post("/api/auth/register", { ...Object.fromEntries(form), email });
+    const registered = await post("/api/auth/register", { ...Object.fromEntries(form), email, turnstileToken });
     if (!registered.ok) {
       setErrors(registered.errors ?? {});
       setMessage(registered.message ?? "");
+      setTurnstileToken("");
+      setTurnstileKey((key) => key + 1);
       setPending(false);
       return;
     }
-    if (!(await link())) setPending(false);
+    if ("checkEmail" in registered) {
+      setCheckEmail(true);
+      setPending(false);
+      return;
+    }
+    if (!("redirectTo" in registered) || !(await link())) setPending(false);
   }
 
   async function handleConfirm() {
@@ -103,8 +115,13 @@ export function LinkOrderPanel({
           </button>
           {alert}
         </div>
+      ) : checkEmail ? (
+        <p className="mt-6 text-[15px] leading-relaxed">
+          Revisa tu correo y abre el enlace para confirmar la cuenta. Cuando inicies sesión, vuelve a este recibo para
+          guardar el pedido.
+        </p>
       ) : (
-        <form onSubmit={handleRegister} noValidate className="mt-6 flex flex-col gap-5">
+        <form method="post" onSubmit={handleRegister} noValidate className="mt-6 flex flex-col gap-5">
           <FormField label="Correo" hint="Es el correo de tu pedido.">
             {(props) => <input {...props} type="email" value={email} readOnly className={`${inputClass(false)} bg-cream`} />}
           </FormField>
@@ -126,10 +143,15 @@ export function LinkOrderPanel({
             )}
           </FormField>
           {errors.email && <p className="text-sm font-medium text-[#B42318]">{errors.email}</p>}
+          {siteKey ? (
+            <TurnstileField key={turnstileKey} onToken={setTurnstileToken} />
+          ) : (
+            <p className="text-sm font-medium text-[#B42318]">No podemos crear la cuenta en este momento. Intenta más tarde.</p>
+          )}
           {alert}
-          <button type="submit" disabled={pending} className={`${buttonPrimary} w-full sm:w-fit`}>
+          <button type="submit" disabled={pending || !siteKey || !turnstileToken} className={`${buttonPrimary} w-full sm:w-fit`}>
             {pending && <CircleNotch weight="bold" className="size-5 motion-safe:animate-spin" aria-hidden />}
-            Crear cuenta y guardar pedido
+            Crear cuenta
           </button>
           <p className="text-[15px] text-muted">
             ¿Ya tienes cuenta?{" "}
