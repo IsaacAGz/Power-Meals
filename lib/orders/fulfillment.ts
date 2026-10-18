@@ -6,20 +6,11 @@ import type { PendingOrderInput } from "./create";
 
 export type ResolvedFulfillment = Pick<PendingOrderInput, "fulfillment" | "kitchenFacilityId">;
 
-/** Resolves the posted zone or pickup point to an active row and its kitchen. */
+/** Resolves a pickup point to its kitchen. Delivery is off, so a posted entrega does not resolve. */
 export async function resolveFulfillment(input: CheckoutInput): Promise<ResolvedFulfillment | undefined> {
-  const db = getDb();
-  if (input.metodo === "entrega") {
-    const [zone] = await db
-      .select({ id: schema.deliveryZones.id, facilityId: schema.deliveryZones.kitchenFacilityId })
-      .from(schema.deliveryZones)
-      .where(and(eq(schema.deliveryZones.slug, input.zona), eq(schema.deliveryZones.isActive, true)));
-    return zone && {
-      fulfillment: { type: "delivery", zoneId: zone.id, address: input.direccion },
-      kitchenFacilityId: zone.facilityId,
-    };
-  }
-  const [point] = await db
+  if (input.metodo === "entrega") return undefined;
+
+  const [point] = await getDb()
     .select({ id: schema.pickupPoints.id, facilityId: schema.pickupPoints.kitchenFacilityId })
     .from(schema.pickupPoints)
     .where(and(eq(schema.pickupPoints.slug, input.punto), eq(schema.pickupPoints.isActive, true)));

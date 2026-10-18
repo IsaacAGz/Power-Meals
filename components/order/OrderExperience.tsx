@@ -124,7 +124,14 @@ export function OrderExperience({
         </div>
         <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="mt-8">
           {tab === "platillo" ? (
-            <MealBuilder catalog={catalog} initialTemplate={initial.template} onAdd={add} />
+            <MealBuilder
+              catalog={catalog}
+              initialTemplate={initial.template}
+              lines={cart.lines.filter((line) => line.item.kind === "meal")}
+              busyKey={busyKey}
+              onAdd={add}
+              onSetQuantity={changeQuantity}
+            />
           ) : (
             <PackageBuilder catalog={catalog} initialPackage={initial.package} onAdd={add} />
           )}

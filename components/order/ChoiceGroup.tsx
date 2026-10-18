@@ -15,7 +15,7 @@ export function ChoiceGroup<T extends string>({
 }: {
   legend: string;
   options: Choice<T>[];
-  value: T;
+  value: T | "";
   onChange: (value: T) => void;
   className?: string;
 }) {

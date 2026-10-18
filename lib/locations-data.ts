@@ -1,4 +1,4 @@
-// Delivery zones and pickup points feed checkout. The map pins are the kitchens.
+// Delivery zones stay in the catalog for later. Checkout pickup points are the four kitchens.
 import { kitchenLocations } from "./kitchens";
 
 export type LngLat = [number, number];
@@ -20,7 +20,7 @@ export type PickupPoint = {
 export const MAP_CENTER: LngLat = [-116.97, 32.518];
 export const MAP_ZOOM = 11;
 
-/** Pins on /ubicaciones and the home map. Checkout pickup points stay separate. */
+/** Pins on /ubicaciones and the home map. Checkout pickup uses these same kitchens. */
 export const mapPins: PickupPoint[] = kitchenLocations.map((kitchen) => ({
   slug: kitchen.slug,
   name: kitchen.name,
@@ -37,22 +37,14 @@ export const zones: Zone[] = [
   { slug: "playas", name: "Playas de Tijuana", days: "Miércoles y sábado" },
 ];
 
-export const pickupPoints: PickupPoint[] = [
-  {
-    slug: "recoleccion-zona-rio",
-    name: "Punto Zona Río",
-    address: "Paseo de los Héroes, Zona Río",
-    hours: "Lunes a sábado, 9:00 a 18:00",
-    coordinates: [-117.0172, 32.5268],
-  },
-  {
-    slug: "recoleccion-playas",
-    name: "Punto Playas",
-    address: "Paseo Ensenada, Playas de Tijuana",
-    hours: "Miércoles y sábado, 10:00 a 16:00",
-    coordinates: [-117.1215, 32.5238],
-  },
-];
+/** Checkout pickup. The name is the kitchen name; the map pins have no street address. */
+export const pickupPoints: PickupPoint[] = kitchenLocations.map((kitchen) => ({
+  slug: kitchen.slug,
+  name: kitchen.name,
+  address: "",
+  hours: "",
+  coordinates: [kitchen.longitude, kitchen.latitude],
+}));
 
 export function getZone(slug: string | undefined | null) {
   if (!slug) return undefined;

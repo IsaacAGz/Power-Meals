@@ -1,4 +1,4 @@
-import { inArray, sql } from "drizzle-orm";
+import { inArray, notInArray, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { baseSeed, filterSeed, packageSeed, portionSeed, proteinSeed, templateSeed } from "../catalog/seed-data";
 import { kitchenLocations } from "../kitchens";
@@ -20,10 +20,9 @@ const zoneFacility: Record<string, FacilitySlug> = {
   playas: "zona-rio",
 };
 
-const pickupPointFacility: Record<string, FacilitySlug> = {
-  "recoleccion-zona-rio": "zona-rio",
-  "recoleccion-playas": "zona-rio",
-};
+const pickupPointFacility: Record<string, FacilitySlug> = Object.fromEntries(
+  kitchenLocations.map((kitchen) => [kitchen.slug, kitchen.slug]),
+);
 
 const weekdayByName: Record<string, number> = {
   lunes: 1,
@@ -102,6 +101,7 @@ export async function seed(db: SeedDatabase) {
           longitude: point.coordinates[0],
           latitude: point.coordinates[1],
           kitchenFacilityId: facilityId.get(facilityFor(pickupPointFacility, point.slug, "pickup point"))!,
+          isActive: true,
         })),
       )
       .onConflictDoUpdate({
@@ -112,9 +112,16 @@ export async function seed(db: SeedDatabase) {
           hoursLabel: sql`excluded.hours_label`,
           latitude: sql`excluded.latitude`,
           longitude: sql`excluded.longitude`,
+          kitchenFacilityId: sql`excluded.kitchen_facility_id`,
+          isActive: sql`excluded.is_active`,
         },
       })
       .returning({ id: schema.pickupPoints.id });
+
+    await tx
+      .update(schema.pickupPoints)
+      .set({ isActive: false })
+      .where(notInArray(schema.pickupPoints.slug, staticPickupPoints.map((point) => point.slug)));
 
     return {
       kitchenFacilities: facilities.length,

@@ -89,6 +89,8 @@ After Accounts 3, update [`.cursor/rules/application.mdc`](./.cursor/rules/appli
 
 **Exit criteria:** Checkout lists the four kitchens and no other pickup point. Delivery cannot be chosen and cannot be submitted. An order for Otay is assigned to the Otay kitchen.
 
+**Status:** Done. Checkout lists Otay, Plaza Monarca, Rio Tijuana 3ra Etapa, and Zona Río. Delivery is disabled and a posted delivery does not resolve. Otay pickup is assigned to the Otay kitchen.
+
 ### Pedido 2 — Arma tu platillo rows
 
 **Goal:** The customer confirms one plate at a time. Each confirm adds it to the cart and leaves a new empty row underneath. The switch between Arma tu platillo and Paquetes stays, and the package layout stays as it is.
@@ -101,6 +103,8 @@ After Accounts 3, update [`.cursor/rules/application.mdc`](./.cursor/rules/appli
 - The cart summary stays for the total and checkout. Confirmed plates appear there too.
 
 **Exit criteria:** Confirming two different plates leaves two cart lines and one empty row. Changing quantity or deleting a confirmed plate updates the cart. A plantilla only fills the open row. A package added from Paquetes is unchanged.
+
+**Status:** Done. Confirmar stays disabled until base, proteína, tamaño, estilo, and salsa are chosen, then adds one line and leaves an empty row. Quantity and delete update the cart. A plantilla only fills the open row. Paquetes still adds a package.
 
 ## Turn on later
 

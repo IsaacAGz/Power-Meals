@@ -39,7 +39,7 @@ export function CheckoutForm({
     nombre: prefill.name,
     telefono: prefill.phone,
     correo: prefill.email,
-    metodo: initialPoint ? "recoleccion" : "entrega",
+    metodo: "recoleccion",
     zona: initialZone ?? "",
     direccion: "",
     punto: initialPoint ?? "",
@@ -123,7 +123,7 @@ export function CheckoutForm({
         metodo: input.metodo,
         zona: zone?.name,
         direccion: input.direccion.trim(),
-        punto: point ? `${point.name}, ${point.address}` : undefined,
+        punto: point ? (point.address ? `${point.name}, ${point.address}` : point.name) : undefined,
         lineas: cart.lines.map((line) => ({
           name: line.slotNames.length > 0 ? `${line.displayName} (${groupNames(line.slotNames).join("; ")})` : line.displayName,
           price: line.unitPriceCents / 100,
@@ -218,14 +218,18 @@ export function CheckoutForm({
         <div role="radiogroup" aria-label="Método" className="grid grid-cols-2 gap-2">
           {(
             [
-              { id: "entrega", label: "Entrega a domicilio" },
-              { id: "recoleccion", label: "Recolección" },
+              { id: "entrega", label: "Entrega a domicilio", disabled: true },
+              { id: "recoleccion", label: "Recolección", disabled: false },
             ] as const
           ).map((option) => (
             <label
               key={option.id}
-              className={`flex h-12 cursor-pointer items-center justify-center rounded-control border px-3 text-center text-[15px] font-semibold transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink ${
-                input.metodo === option.id ? "border-ink bg-ink text-cream" : "border-line-strong bg-paper text-ink hover:border-ink"
+              className={`flex h-12 items-center justify-center rounded-control border px-3 text-center text-[15px] font-semibold transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink ${
+                option.disabled
+                  ? "cursor-not-allowed border-line-strong bg-paper text-muted"
+                  : input.metodo === option.id
+                    ? "border-ink bg-ink text-cream"
+                    : "cursor-pointer border-line-strong bg-paper text-ink hover:border-ink"
               }`}
             >
               <input
@@ -233,6 +237,7 @@ export function CheckoutForm({
                 name="metodo"
                 value={option.id}
                 checked={input.metodo === option.id}
+                disabled={option.disabled}
                 onChange={() => set({ metodo: option.id })}
                 className="sr-only"
               />
@@ -240,6 +245,7 @@ export function CheckoutForm({
             </label>
           ))}
         </div>
+        <p className="text-[13px] text-muted">La entrega a domicilio no está disponible por ahora.</p>
 
         {input.metodo === "entrega" ? (
           <div className="grid gap-5 sm:grid-cols-[1fr_1.4fr]">
@@ -296,7 +302,7 @@ export function CheckoutForm({
                   <option value="">Elige un punto</option>
                   {points.map((point) => (
                     <option key={point.slug} value={point.slug}>
-                      {point.name}, {point.address}
+                      {point.address ? `${point.name}, ${point.address}` : point.name}
                     </option>
                   ))}
                 </select>

@@ -40,8 +40,7 @@ export function validateCheckout(input: CheckoutInput, { requireEmail }: { requi
     if (!EMAIL_PATTERN.test(input.correo)) errors.correo = "Escribe un correo válido para tu recibo.";
   }
   if (input.metodo === "entrega") {
-    if (!input.zona) errors.zona = "Elige tu zona de entrega.";
-    if (input.direccion.length < 6) errors.direccion = "Escribe tu dirección con calle y número.";
+    errors.zona = "La entrega a domicilio no está disponible por ahora.";
   } else if (!input.punto) {
     errors.punto = "Elige un punto de recolección.";
   }
