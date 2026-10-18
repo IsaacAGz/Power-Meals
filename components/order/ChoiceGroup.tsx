@@ -21,15 +21,15 @@ export function ChoiceGroup<T extends string>({
 }) {
   const name = useId();
   return (
-    <fieldset>
+    <fieldset className="min-w-0">
       <legend className="mb-3 text-sm font-semibold text-ink">{legend}</legend>
-      <div className={`grid gap-2 ${className}`}>
+      <div className={`grid min-w-0 gap-2 ${className}`}>
         {options.map((option) => {
           const selected = option.value === value;
           return (
             <label
               key={option.value}
-              className={`flex min-h-12 cursor-pointer flex-col items-center justify-center rounded-control border px-3 py-2 text-center transition-colors has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-40 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink ${
+              className={`flex min-h-12 min-w-0 cursor-pointer flex-col items-center justify-center rounded-control border px-2 py-2 text-center transition-colors has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-40 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink sm:px-3 ${
                 selected ? "border-ink bg-ink text-cream" : "border-line-strong bg-paper text-ink hover:border-ink"
               }`}
             >
@@ -42,7 +42,7 @@ export function ChoiceGroup<T extends string>({
                 onChange={() => onChange(option.value)}
                 className="sr-only"
               />
-              <span className="text-[15px] leading-tight font-semibold">{option.label}</span>
+              <span className="text-[15px] leading-tight font-semibold break-words">{option.label}</span>
               {option.hint && (
                 <span className={`mt-0.5 font-mono text-[12px] ${selected ? "text-cream/70" : "text-muted"}`}>{option.hint}</span>
               )}

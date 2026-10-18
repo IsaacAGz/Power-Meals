@@ -74,7 +74,7 @@ export function OrderExperience({
   ];
 
   return (
-    <div className="flex flex-col gap-14">
+    <div className="flex min-w-0 flex-col gap-14">
       {recentOrders.length > 0 && (
         <section aria-labelledby="pedir-de-nuevo">
           <h2 id="pedir-de-nuevo" className="font-display text-2xl font-extrabold tracking-tight">
@@ -104,7 +104,7 @@ export function OrderExperience({
       )}
 
       <section aria-label="Elige tus platillos">
-        <div role="tablist" aria-label="Tipo de pedido" className="flex gap-2">
+        <div role="tablist" aria-label="Tipo de pedido" className="flex flex-wrap gap-2">
           {tabs.map((option) => (
             <button
               key={option.id}

@@ -138,7 +138,7 @@ export default async function PedidoPage({ searchParams }: PageProps<"/pedido">)
           <PaymentDetails openpayEnabled={openpayEnabled} className="mt-10 hidden lg:block" />
         </aside>
 
-        <div>
+        <div className="min-w-0">
           <OrderExperience
             catalog={catalog}
             initialCart={toCartView(cart)}
