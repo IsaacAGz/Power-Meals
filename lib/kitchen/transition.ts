@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import { getDb, schema, type Database } from "@/lib/db";
+import { queueOrderNotification } from "@/lib/orders/notify";
 import { queueKitchenTicket } from "./dispatch";
 import { KITCHEN_STATUSES, nextKitchenStep, type KitchenStatus } from "./types";
 
@@ -56,6 +57,7 @@ export async function advanceKitchenOrderStatus(
         .set({ status: "succeeded" })
         .where(and(eq(schema.payments.orderId, order.id), eq(schema.payments.status, "pending")));
       await queueKitchenTicket(tx, order.id, order.kitchenFacilityId);
+      await queueOrderNotification(tx, order.id);
     }
     return { ok: true as const, status: to, becamePaid: to === "paid" };
   });

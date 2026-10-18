@@ -4,12 +4,13 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { ArrowRight, CheckCircle } from "@phosphor-icons/react/dist/ssr";
 import { LinkOrderPanel } from "@/components/order/LinkOrderPanel";
-import { PaymentStatusPoller } from "@/components/order/PaymentStatusPoller";
+import { OrderStatusTracker } from "@/components/order/OrderStatusTracker";
 import { ReceiptSummary } from "@/components/order/ReceiptSummary";
 import { TooManyRequests } from "@/components/order/TooManyRequests";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { issueLinkToken } from "@/lib/orders/link";
 import { getPublicReceipt } from "@/lib/orders/public-receipt";
+import { isSettledPublicStatus, receiptLead } from "@/lib/orders/public-status";
 import { isPublicOrderRef, receiptPath } from "@/lib/orders/ref";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { clientIpFromHeaders } from "@/lib/request";
@@ -35,35 +36,35 @@ export default async function PedidoSuccessPage({ searchParams }: PageProps<"/pe
   if (!receipt) notFound();
   if (receipt.status === "failed") redirect(receiptPath(ref, "cancel"));
 
-  const paid = receipt.status === "paid";
-  const whatsApp = receipt.status === "whatsapp";
+  const settled = isSettledPublicStatus(receipt.status);
+  const pending = receipt.status === "pending";
   const user = await getCurrentUser();
   const ownedByViewer = user !== null && receipt.ownerUserId === user.id;
   const isGuestOrder = receipt.ownerUserId === null;
   const emailMatches = user !== null && user.email.toLowerCase() === receipt.customerEmail.toLowerCase();
-  const linkToken = paid && isGuestOrder && (!user || emailMatches) ? await issueLinkToken(ref) : null;
-  const firstName = receipt.customerName.split(" ")[0];
+  const linkToken = settled && isGuestOrder && (!user || emailMatches) ? await issueLinkToken(ref) : null;
+  const lead = receiptLead(receipt.status, receipt.customerName.split(" ")[0] ?? "");
 
   return (
     <section className="pt-12 pb-24 md:pt-20 md:pb-32">
       <div className={container}>
         <div className="mx-auto flex max-w-[760px] flex-col gap-10">
           <header>
-            {(paid || whatsApp) && <CheckCircle weight="bold" className="size-10 text-ink" aria-hidden />}
+            {!pending && <CheckCircle weight="bold" className="size-10 text-ink" aria-hidden />}
             <h1 className="mt-5 font-display text-5xl leading-[1] font-extrabold tracking-[-0.03em] md:text-6xl">
-              {paid || whatsApp ? `¡Gracias, ${firstName}!` : "Recibimos tu pedido"}
+              {lead.title}
             </h1>
             <p className="mt-5 text-lg leading-relaxed text-muted">
-              Pedido <span className="font-mono text-ink">#{receipt.orderNumber}</span>
-              {paid
-                ? ". Tu pago está confirmado; te contactamos para coordinar la entrega."
-                : whatsApp
-                  ? ". Quedó guardado como pedido por WhatsApp. El pago por transferencia sigue pendiente."
-                  : ". En cuanto Openpay confirme el pago, lo verás aquí."}
+              Pedido <span className="font-mono text-ink">#{receipt.orderNumber}</span>. {lead.detail}
             </p>
           </header>
 
-          {!paid && !whatsApp && <PaymentStatusPoller orderRef={ref} cancelPath={receiptPath(ref, "cancel")} />}
+          <OrderStatusTracker
+            orderRef={ref}
+            status={receipt.status}
+            origin={receipt.origin}
+            cancelPath={receiptPath(ref, "cancel")}
+          />
 
           <ReceiptSummary receipt={receipt} />
 
@@ -78,7 +79,7 @@ export default async function PedidoSuccessPage({ searchParams }: PageProps<"/pe
             />
           )}
 
-          {paid && isGuestOrder && user && !emailMatches && (
+          {settled && isGuestOrder && user && !emailMatches && (
             <p className="text-[15px] text-muted">
               Este pedido se hizo con otro correo, así que no podemos guardarlo en tu cuenta.
             </p>
@@ -95,7 +96,7 @@ export default async function PedidoSuccessPage({ searchParams }: PageProps<"/pe
                 Ver menú
               </Link>
             )}
-            {!paid && !whatsApp && (
+            {pending && (
               <p className="self-center text-[15px] text-muted">
                 ¿Problemas con el pago?{" "}
                 <Link href="/pedido" className={textLink}>

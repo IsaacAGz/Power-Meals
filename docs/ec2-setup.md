@@ -163,6 +163,20 @@ Tickets that land in the DLQ (a kitchen PC was off too long, or a payload the da
 psql "$DATABASE_URL" -c "select o.order_number, d.status, d.attempts, d.last_error from kitchen_dispatches d join orders o on o.id = d.order_id where d.status <> 'sent' order by d.created_at desc limit 20"
 ```
 
+### Paid-order email (SES)
+
+The first transition to paid messages the customer once, with the receipt link. An order with an email is sent through SES. An order with a phone and no email is sent through the WhatsApp Cloud API (`WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, and `WHATSAPP_TEMPLATE_NAME` for an approved es_MX utility template whose body variables are first name, order number, and receipt link). Later kitchen steps do not send again. Give the EC2 role `ses:SendEmail` for the verified identity, set `ORDER_EMAIL_FROM` to that from-address (same `AWS_REGION` as SQS), and install the retry timer. A channel left unset records the row as `skipped`, so setting it later does not message old orders.
+
+```bash
+sudo cp deploy/systemd/power-meals-notify.service deploy/systemd/power-meals-notify.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now power-meals-notify.timer
+```
+
+```bash
+psql "$DATABASE_URL" -c "select o.order_number, n.channel, n.status, n.attempts, n.last_error from order_notifications n join orders o on o.id = n.order_id where n.status <> 'sent' order by n.created_at desc limit 20"
+```
+
 ## 7. Nginx
 
 Merge [`deploy/nginx/powermeals.conf`](../deploy/nginx/powermeals.conf) into the existing config. Uncomment the `set_real_ip_from` block with CloudFront's origin-facing ranges; without it every rate limit applies per CloudFront edge rather than per client.
@@ -192,4 +206,4 @@ Forward the session cookie only on the uncached behaviors so cached responses ne
 
 ## Cloudflare static deploy
 
-`main` still builds the static export for Cloudflare Workers. The `v2` branch removes `output: "export"` and cannot produce `out/`, so do not run `wrangler deploy` from it. Cloudflare is retired in Phase 5 once EC2 is stable (see [PLAN.md](../PLAN.md)).
+`main` still builds the static export for Cloudflare Workers. The `v2` branch removes `output: "export"` and cannot produce `out/`, so do not run `wrangler deploy` from it. Cloudflare is retired in the production cutover once EC2 is stable (see [PLAN.md](../PLAN.md#production-cutover)).

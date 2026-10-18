@@ -26,7 +26,7 @@ export default async function PedidoCancelPage({ searchParams }: PageProps<"/ped
 
   const receipt = await getPublicReceipt(ref);
   if (!receipt) notFound();
-  if (receipt.status === "paid" || receipt.status === "whatsapp") redirect(receiptPath(ref));
+  if (receipt.status !== "pending" && receipt.status !== "failed") redirect(receiptPath(ref));
 
   return (
     <section className="pt-12 pb-24 md:pt-20 md:pb-32">

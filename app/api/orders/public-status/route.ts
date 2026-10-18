@@ -6,7 +6,7 @@ import { clientIp } from "@/lib/request";
 
 const noStore = { "Cache-Control": "no-store" };
 
-/** Polled by the success page while the webhook is pending. Sessionless; returns status only. */
+/** Polled by the receipt until the order is delivered or cancelled. Sessionless; status and origin only. */
 export async function GET(request: NextRequest) {
   const limit = await hitRateLimit(`order-status:ip:${clientIp(request)}`, 60, 60);
   if (!limit.allowed) {

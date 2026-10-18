@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { clearGuestCart, clearUserCart } from "@/lib/cart";
 import { getDb, schema, type Database } from "@/lib/db";
 import { queueKitchenTicket, sendKitchenTicket } from "@/lib/kitchen/dispatch";
+import { queueOrderNotification, sendOrderNotification } from "@/lib/orders/notify";
 import type { Charge } from "@/lib/openpay";
 import { getRedis } from "@/lib/redis";
 
@@ -76,6 +77,7 @@ export async function recordChargeSucceeded(charge: Charge, event: WebhookEvent)
       .where(eq(schema.payments.orderId, order.id));
     if (order.userId) await clearUserCart(tx, order.userId);
     await queueKitchenTicket(tx, order.id, order.kitchenFacilityId);
+    await queueOrderNotification(tx, order.id);
     await logEvent(tx, event, order.id, "paid");
     return { outcome: "paid" as const, orderId: order.id };
   });
@@ -88,6 +90,7 @@ export async function recordChargeSucceeded(charge: Charge, event: WebhookEvent)
     if (sessionId) await Promise.all([clearGuestCart(sessionId), redis.del(checkoutCartKey(charge.orderId))]);
   }
   await sendKitchenTicket(outcome.orderId);
+  await sendOrderNotification(outcome.orderId);
   return outcome.outcome;
 }
 

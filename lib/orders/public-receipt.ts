@@ -1,17 +1,9 @@
 import "server-only";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { receiptOrigin, toPublicStatus, type PublicStatus, type ReceiptOrigin } from "@/lib/orders/public-status";
 
-export type PublicStatus = "pending" | "paid" | "failed" | "whatsapp";
-
-type OrderStatus = (typeof schema.orderStatus.enumValues)[number];
-
-export function toPublicStatus(status: OrderStatus): PublicStatus {
-  if (status === "pending_payment") return "pending";
-  if (status === "cancelled") return "failed";
-  if (status === "ordered_whatsapp") return "whatsapp";
-  return "paid";
-}
+export type { PublicStatus, ReceiptOrigin };
 
 export type ReceiptLine = { displayName: string; quantity: number; lineTotalCents: number; slots: string[] };
 
@@ -20,6 +12,7 @@ export type PublicReceipt = {
   ref: string;
   orderNumber: number;
   status: PublicStatus;
+  origin: ReceiptOrigin;
   createdAt: Date;
   paidAt: Date | null;
   customerName: string;
@@ -33,11 +26,14 @@ export type PublicReceipt = {
 
 export async function getPublicStatus(ref: string) {
   const [row] = await getDb()
-    .select({ status: schema.orders.status, paidAt: schema.orders.paidAt })
+    .select({ status: schema.orders.status, paidAt: schema.orders.paidAt, provider: schema.payments.provider })
     .from(schema.orders)
+    .leftJoin(schema.payments, eq(schema.payments.orderId, schema.orders.id))
     .where(eq(schema.orders.publicOrderRef, ref))
     .limit(1);
-  return row ? { status: toPublicStatus(row.status), paidAt: row.paidAt?.toISOString() ?? null } : null;
+  if (!row) return null;
+  const status = toPublicStatus(row.status);
+  return { status, origin: receiptOrigin(status, row.provider), paidAt: row.paidAt?.toISOString() ?? null };
 }
 
 /** Loads by public_order_ref only; no session involved, since the Openpay redirect arrives without pm_session. */
@@ -62,10 +58,12 @@ export async function getPublicReceipt(ref: string): Promise<PublicReceipt | nul
       pointHours: schema.pickupPoints.hoursLabel,
       notes: schema.orders.notes,
       totalCents: schema.orders.totalCents,
+      provider: schema.payments.provider,
     })
     .from(schema.orders)
     .leftJoin(schema.deliveryZones, eq(schema.deliveryZones.id, schema.orders.deliveryZoneId))
     .leftJoin(schema.pickupPoints, eq(schema.pickupPoints.id, schema.orders.pickupPointId))
+    .leftJoin(schema.payments, eq(schema.payments.orderId, schema.orders.id))
     .where(eq(schema.orders.publicOrderRef, ref))
     .limit(1);
   if (!order) return null;
@@ -92,10 +90,12 @@ export async function getPublicReceipt(ref: string): Promise<PublicReceipt | nul
     }));
 
   const delivery = order.fulfillmentType === "delivery";
+  const status = toPublicStatus(order.status);
   return {
     ref,
     orderNumber: order.orderNumber,
-    status: toPublicStatus(order.status),
+    status,
+    origin: receiptOrigin(status, order.provider),
     createdAt: order.createdAt,
     paidAt: order.paidAt,
     customerName: order.customerName,

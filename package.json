@@ -15,9 +15,11 @@
     "db:seed": "tsx --env-file-if-exists=.env scripts/seed-from-static-data.ts",
     "db:studio": "drizzle-kit studio",
     "user:create-staff": "tsx --env-file-if-exists=.env scripts/create-staff-user.ts",
-    "kitchen:dispatch": "tsx --conditions=react-server --env-file-if-exists=.env scripts/dispatch-kitchen-tickets.ts"
+    "kitchen:dispatch": "tsx --conditions=react-server --env-file-if-exists=.env scripts/dispatch-kitchen-tickets.ts",
+    "orders:notify": "tsx --conditions=react-server --env-file-if-exists=.env scripts/notify-orders.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-sesv2": "^3.1152.0",
     "@aws-sdk/client-sqs": "^3.1152.0",
     "@node-rs/argon2": "^2.2.2",
     "@phosphor-icons/react": "^2.1.10",

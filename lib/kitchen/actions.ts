@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { requireKitchenStaff } from "@/lib/auth/dal";
+import { sendOrderNotification } from "@/lib/orders/notify";
 import { sendKitchenTicket } from "./dispatch";
 import { advanceKitchenOrderStatus, type TransitionResult } from "./transition";
 import { KITCHEN_STATUSES, type KitchenStatus } from "./types";
@@ -18,7 +19,10 @@ export async function advanceKitchenOrder(orderId: string, fromStatus: string): 
   const result = await advanceKitchenOrderStatus(user.kitchenFacilityId, user.id, orderId, fromStatus);
   if (!result.ok) return result;
 
-  if (result.becamePaid) after(() => sendKitchenTicket(orderId));
+  if (result.becamePaid) {
+    after(() => sendKitchenTicket(orderId));
+    after(() => sendOrderNotification(orderId));
+  }
   revalidatePath("/kitchen/dashboard");
   revalidatePath("/historial");
   return { ok: true, status: result.status };

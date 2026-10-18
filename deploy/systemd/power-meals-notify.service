@@ -1,0 +1,20 @@
+[Unit]
+Description=Power Meals: retry paid-order emails that could not be sent
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=powermeals
+Group=powermeals
+WorkingDirectory=/srv/power-meals
+EnvironmentFile=/srv/power-meals/.env
+Environment=NODE_ENV=production
+# Same command as `npm run orders:notify`; adjust the node path to match power-meals.service.
+ExecStart=/usr/bin/node node_modules/tsx/dist/cli.mjs --conditions=react-server scripts/notify-orders.ts
+TimeoutStartSec=120
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict

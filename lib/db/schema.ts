@@ -408,6 +408,34 @@ export const kitchenDispatches = pgTable(
   ],
 );
 
+/**
+ * One message per order, written in the same transaction as the first transition to paid.
+ * Later kitchen steps do not insert a row. WhatsApp stays skipped until that sender exists.
+ */
+export const orderNotifications = pgTable(
+  "order_notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .unique()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    channel: text("channel").notNull(),
+    destination: text("destination").notNull(),
+    // pending -> sent; failed after too many attempts; skipped when the channel is not configured.
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("order_notifications_pending_idx").on(table.createdAt).where(sql`${table.status} = 'pending'`),
+    check("order_notifications_channel", sql`${table.channel} IN ('email', 'whatsapp')`),
+    check("order_notifications_status", sql`${table.status} IN ('pending', 'sent', 'failed', 'skipped')`),
+  ],
+);
+
 /** Logged-in working cart. Same item shape as the guest Redis cart; prices are re-resolved at checkout. */
 export const cartLineItems = pgTable(
   "cart_line_items",
