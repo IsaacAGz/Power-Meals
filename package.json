@@ -16,7 +16,8 @@
     "db:studio": "drizzle-kit studio",
     "user:create-staff": "tsx --env-file-if-exists=.env scripts/create-staff-user.ts",
     "kitchen:dispatch": "tsx --conditions=react-server --env-file-if-exists=.env scripts/dispatch-kitchen-tickets.ts",
-    "orders:notify": "tsx --conditions=react-server --env-file-if-exists=.env scripts/notify-orders.ts"
+    "orders:notify": "tsx --conditions=react-server --env-file-if-exists=.env scripts/notify-orders.ts",
+    "whatsapp:test": "tsx --conditions=react-server --env-file-if-exists=.env scripts/test-whatsapp.ts"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1152.0",
