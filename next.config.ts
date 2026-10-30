@@ -16,6 +16,8 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // The Playwright server builds into its own folder so it can run beside `npm run dev`.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   images: { unoptimized: true },
   async headers() {
