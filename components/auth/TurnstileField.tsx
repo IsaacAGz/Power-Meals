@@ -33,7 +33,10 @@ export function TurnstileField({ onToken }: { onToken: (token: string) => void }
   const siteKey = turnstileSiteKey();
   const container = useRef<HTMLDivElement>(null);
   const onTokenRef = useRef(onToken);
-  onTokenRef.current = onToken;
+
+  useEffect(() => {
+    onTokenRef.current = onToken;
+  }, [onToken]);
 
   useEffect(() => {
     const element = container.current;

@@ -11,15 +11,15 @@ export default function VerificarPage() {
 
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get("token") ?? "";
-    if (!token) {
-      setMessage("Este enlace no es válido o ya venció.");
-      return;
-    }
     // Dev remounts this page once. A second request would burn the single-use token and show an error
     // after the first request had already signed the person in.
     const key = `pm-verify:${token}`;
     let cancelled = false;
     (async () => {
+      if (!token) {
+        setMessage("Este enlace no es válido o ya venció.");
+        return;
+      }
       if (!sessionStorage.getItem(key)) {
         sessionStorage.setItem(key, "pending");
         try {

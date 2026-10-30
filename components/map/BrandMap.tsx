@@ -51,6 +51,7 @@ export default function BrandMap({
 
     let cancelled = false;
     let map: MapLibreMap | null = null;
+    const markerElements = markerEls.current;
     const markerRoots: Root[] = [];
     const markers: { remove: () => void }[] = [];
 
@@ -115,7 +116,7 @@ export default function BrandMap({
           const root = createRoot(element);
           root.render(<Lightning weight="bold" className="size-[18px]" />);
           markerRoots.push(root);
-          markerEls.current.set(point.slug, element);
+          markerElements.set(point.slug, element);
 
           const popupBody = document.createElement("div");
           const title = document.createElement("strong");
@@ -146,7 +147,7 @@ export default function BrandMap({
 
     return () => {
       cancelled = true;
-      markerEls.current.clear();
+      markerElements.clear();
       markers.forEach((marker) => marker.remove());
       const roots = markerRoots.splice(0);
       queueMicrotask(() => roots.forEach((root) => root.unmount()));
