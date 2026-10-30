@@ -2,13 +2,15 @@
 
 Source brief for a portfolio case study. Rewrite this in the portfolio's voice. Keep the facts. Do not add metrics, client quotes, revenue, or launch claims that are not in this document.
 
+The runtime model for anyone changing the code is [`.cursor/rules/application.mdc`](./.cursor/rules/application.mdc). This file is the case-study source. When they disagree, follow the code.
+
 ## One-line summary
 
-Spanish-language marketing and ordering site for a Tijuana meal-prep kitchen. Customers browse the menu and pickup points, then send a fully written order to WhatsApp. Payment happens later by bank transfer, not on the site.
+Spanish-language ordering site for a Tijuana meal-prep kitchen. Customers build plates or pick weekly packages, then place an order that the kitchen tracks. Live checkout is WhatsApp plus a bank transfer. Accounts, a kitchen dashboard, and a receipt tracker are part of the site. Card checkout is built and stays off.
 
 ## Role
 
-I designed and built the site end to end: information architecture, visual system, page layouts, order flow, map, and the static deployment.
+I designed and built the product end to end: information architecture, visual system, plate builder, cart, accounts, order pipeline, kitchen board, map, and the print and notification outbox.
 
 ## The product
 
@@ -16,59 +18,95 @@ Power Meals is a local meal-prep brand in Tijuana, Baja California. The offer is
 
 The banner is: **Comida real. Energía real. Resultados reales.**
 
-The site does not pretend to be an app, a marketplace, or an online store. It is a brand site with one conversion path:
+The first version was a static brand site whose only conversion was a `wa.me` link. The kitchen already sold through WhatsApp and a bank transfer, so the useful job was a complete, readable order instead of a blank "hola, quiero pedir." That path is still the live one. The current app keeps it and adds the records the kitchen needs: a priced cart, an order row, a status the customer can watch, and a board for the staff at each kitchen.
 
-1. Choose dishes, or choose a pickup point.
-2. Fill a short order form.
-3. The form opens WhatsApp with the order already written: name, phone, delivery or pickup, line items, estimated total in MXN, and notes.
-4. The kitchen confirms availability in chat and sends bank details there.
-5. The order is confirmed when the transfer arrives.
-
-There is no card checkout, no account, and no WhatsApp Business API. `wa.me` deep links are the integration. The business number is +1 619 600 1137.
-
-That constraint is the product decision. A meal-prep kitchen in Tijuana already sells through WhatsApp and transfer. The site's job is to make that conversation start with a complete, readable order instead of a blank "hola, quiero pedir."
+There is still no card charge on the live path, and no WhatsApp Business message to the customer until a template is approved. The business number on the public `wa.me` links is +1 619 600 1137. That link only opens a chat the customer starts. It is not how the site messages them after an order is paid.
 
 ## Pages
 
 | Route | What it does |
 | --- | --- |
-| `/` | Brand home. Full-viewport split hero, how ordering works, a horizontal menu strip, a map teaser, and a closing call to order. |
+| `/` | Brand home. Full-viewport split hero, how ordering works, a menu strip, a map teaser, and a closing call to order. Copy switches when card payment is on. |
 | `/nosotros` | Editorial about page. Origin story and what the kitchen cares about: local ingredients, protein, ready-for-the-week packaging, and proximity. |
-| `/menu` | Menu and prices. Category tabs (all, high protein, balanced, light, breakfast). Each dish links into the order form with that dish preselected. |
-| `/ubicaciones` | Pickup explorer. A list of drop-off points beside a MapLibre map of Tijuana. Choosing a point flies the map there. "Recoger en este punto" opens the order form in pickup mode. |
+| `/menu` | Menu of suggested plates, with filters. Each plate can start an order. Copy switches when card payment is on. |
+| `/ubicaciones` | Map of the four kitchens. Choosing one flies the map there. Pickup at checkout uses these same kitchens. |
 | `/proyectos` | Partner page for gyms, studios, and offices. Logo row and two case rows, plus a WhatsApp prompt for businesses that want to partner. |
-| `/pedido` | The order form, with the payment explanation beside it on desktop and below it on mobile. |
+| `/pedido` | Plate builder, suggested plates, POWER packages, cart, and checkout. |
+| `/pedido/success`, `/pedido/cancel` | Sessionless receipt by `order_ref`. The success page shows each kitchen step and polls until the order is completed or cancelled. |
+| `/ingresar`, `/registro`, `/cuenta`, `/historial` | Customer sign-in, registration, profile, and order history. |
+| `/verificar` | Email confirmation link. Opening it signs the person in. |
+| `/recuperar`, `/recuperar/nueva` | Password reset request and the one-time new-password page. |
+| `/kitchen/dashboard` | Staff only, scoped to one kitchen. Marketing header and footer are hidden. |
 
 Shared chrome: sticky header (logo, nav, persistent "Pedir" button, full-screen mobile menu), footer with the WhatsApp number, and a skip link.
 
-Deep links carry context so people do not retype what they already chose:
+## Ordering
 
-- `/pedido?platillo=salmon-quinoa` adds that dish at quantity 1.
-- `/pedido?zona=zona-rio` preselects the delivery zone.
-- `/pedido?punto=recoleccion-playas` switches the form to pickup and selects that point.
+The sellable catalog is not a list of fixed dishes. It is proteins, carb bases, portion sizes, suggested plates, and two package families, POWER Chicken and POWER Mix. Prices are integer cents in PostgreSQL. Checkout recomputes them on the server. The total shown in the browser is a preview.
 
-## What is real and what is still placeholder
+A plate is base, protein, tamaño (Regular or Plus), estilo (Balanceado or Doble carb), and salsa (Roja or Verde). A new row opens with Regular, Balanceado, and Roja already selected. Confirmar stays disabled until base and protein are chosen too. Confirming adds one cart line at quantity 1 and leaves a new empty row underneath. A confirmed plate can change quantity (1–20) or be removed. The cart holds at most 30 lines.
 
-Say this plainly if the portfolio mentions content. Do not present placeholders as a live catalog or a client roster.
+Suggested plates sit under the builder. A few stay visible. The rest are behind "Ver más platillos," which expands with a height animation and a fade so the hidden rows do not cut off hard. Choosing one fills the open row. It does not add a line by itself. Packages stay on their own tab: 6, 10, or 15 meals, Regular or Plus. A package is one priced header plus a slot per meal.
 
-- Menu names, descriptions, prices, and food photography are an editable stand-in catalog in `lib/menu-data.ts`. Eight dishes, four categories, prices in MXN.
-- Partner names and case studies on `/proyectos` are stand-ins, marked that way in the source.
-- Pickup addresses, hours, and coordinates are stand-in points in Tijuana (Zona Río and Playas).
-- Delivery zones (Zona Río, Chapultepec, Hipódromo, Otay, Playas de Tijuana) and their delivery days are real product structure, used by the order form. They are no longer drawn on the map.
-- Bank, CLABE, and account holder are intentionally absent. The form says those details are sent on WhatsApp after confirmation.
+Checkout is pickup only, at the four kitchens on the map: Zona Río, Otay, Plaza Monarca, and Rio Tijuana 3ra Etapa. "Entrega a domicilio" is visible and disabled. A posted delivery is rejected. The order is assigned to the kitchen of the pickup point.
+
+Two ways an order is born:
+
+- **Logged in, WhatsApp.** One transaction writes the order, frozen line items, a pending payment, and the first status event. Status is `ordered_whatsapp`. The cart is cleared. This is not paid and does not print.
+- **Guest, WhatsApp.** Nothing is inserted. The checkout body is stored on that browser's session. Login or register on the same browser claims it, re-prices it, and inserts the order. A login on another device does not see it. If a line no longer resolves, the snapshot is dropped and the cart stays.
+- **Card, only when Openpay is configured.** Status starts at `pending_payment`. The webhook re-fetches the charge. The first verified success sets `paid` and clears the cart. A WhatsApp order is never marked paid from that webhook. `POST /api/checkout` returns 503 while the keys are unset. Home, menu, footer, and the order page keep the transfer copy until both keys are set.
+
+After a WhatsApp order, only a staff action moves it to paid. The path is `ordered_whatsapp` → `paid` → `preparing` → `ready` → `completed`. The customer sees the same steps on `/historial` and on the receipt link, without the phone number.
+
+The first transition to `paid` writes one notification and one kitchen ticket in that same transaction. Email is used when the order has an address; otherwise WhatsApp. Later steps send nothing. If the mail sender or the queue is unset, the row is stored as `skipped`, and turning the channel on later does not message or print those old orders.
+
+## Accounts
+
+Passwords are Argon2id with a server-side pepper, minimum 10 characters. The session cookie is HttpOnly and SameSite=Strict and holds only the session id. Redis stores the session, the guest cart, and a guest WhatsApp snapshot, and slides them together.
+
+Public registration requires a Cloudflare Turnstile token. A missing or failed token does not create a user. A new account is not signed in. Redis holds a single-use confirm link for 24 hours, and Amazon SES sends it. If the sender is unset or the send fails, the new user row is not kept. Login with the right password before the link is opened tells them to confirm. A wrong password stays a generic error. Opening the link marks the email confirmed and signs them in.
+
+Password reset is only the email link. The request form requires Turnstile and always answers the same sentence, whether or not the address exists. The link lasts one hour, sets the new password once, marks the email confirmed, and signs them in.
+
+Kitchen staff are a separate role, tied to one facility. Public registration creates customers only. Staff accounts are created with a script.
+
+## Kitchen
+
+`/kitchen/dashboard` loads only the staff member's facility. It polls every 10 seconds, pauses while the tab is hidden, and rolls back an optimistic status change the server rejects. The client sends the expected current status so a double click cannot skip a step. Staff see phone, fulfillment, notes, grams, style, and salsa.
+
+The ticket is an 80mm Spanish receipt. A small Node daemon pulls one Amazon SQS queue, prints tickets for its own kitchen, and hands other kitchens' messages back. The queue has been verified against a local stand-in. A real AWS queue has not been exercised.
+
+## What is real and what is still off
+
+Say this plainly if the portfolio mentions content or launch. Do not present stand-ins as a live catalog, a client roster, or a production deploy.
+
+- The catalog the app prices is seeded in PostgreSQL: seven proteins, five bases, nineteen suggested plates, and POWER Chicken / POWER Mix at 6, 10, and 15 meals. Regular plates start at $139 MXN and Plus at $179 MXN. Premium proteins add a per-plate upgrade. Food photography reuses stand-in images until a menu shoot.
+- Partner names and case studies on `/proyectos` are placeholders, marked that way in the source.
+- Map pins are the four kitchen coordinates. They have no street address, and the checkout choice does not invent one.
+- Bank, CLABE, and account holder are intentionally absent. The kitchen sends those details on WhatsApp after the order.
+- Card payment (Openpay) is implemented and off until merchant credentials exist. The site copy says transfer, not card.
+- Delivery is shown and cannot be selected.
+- Paid-order email needs `ORDER_EMAIL_FROM`. Paid-order WhatsApp needs an approved Spanish utility template and three Cloud API env vars. The kitchen printer needs `SQS_QUEUE_URL`. Each of those stays skipped until it is set.
+- The app runs locally on Node, PostgreSQL, and Redis. Production cutover to EC2 and `powermeals.mx` is not done. The old Cloudflare static deploy is still in the repo and is not the current app.
 
 ## Tech stack
 
-- **Next.js 16** App Router, **React 19**, **TypeScript**
+- **Next.js 16** App Router on **Node**, **React 19**, **TypeScript**. Not a static export.
 - **Tailwind CSS v4** (`@tailwindcss/postcss`), brand tokens in `@theme`
-- **Motion** (`motion/react`) for hero and scroll reveals, menu transitions, and form state changes
+- **Drizzle ORM** and **PostgreSQL** for the catalog, users, orders, payments, and status events
+- **Redis** for sessions, guest carts, WhatsApp order snapshots, and one-time email tokens
+- **Motion** (`motion/react`) for hero and scroll reveals, menu transitions, and the suggested-plate expand
 - **MapLibre GL JS** with a **MapTiler** `dataviz-light` style, recolored to the brand
 - **Phosphor Icons**, bold weight. Server components import `@phosphor-icons/react/dist/ssr`
+- **Argon2id** (`@node-rs/argon2`) and a `PASSWORD_PEPPER`
+- **Cloudflare Turnstile** on registration and password-reset requests
+- **Amazon SES** for confirmation, reset, and paid-order email
+- **Amazon SQS** and a separate Node print daemon (`packages/print-daemon`) for kitchen tickets
+- **Openpay** redirect checkout and webhook, compiled in and left off
 - **Fonts:** Cabinet Grotesk (local, display), Geist (body), Geist Mono (prices)
-- **Static export** (`output: "export"`) deployed as **Cloudflare Workers static assets** via Wrangler. The build writes `out/`, and `wrangler.jsonc` serves that directory. Node 22.
-- Content lives in typed modules (`lib/menu-data.ts`, `lib/locations-data.ts`, `lib/whatsapp.ts`). No CMS, no database, no API routes.
+- Money is formatted with `Intl.NumberFormat` for `es-MX` from integer cents. Timezone is `America/Tijuana`.
 
-`next/image` is used for layout and `sizes`, with `images.unoptimized: true`, because the image optimizer needs a server and this deploy is a folder of static files. The favicon is generated with `next/og` `ImageResponse` and `dynamic = "force-static"`: black square, yellow lightning bolt.
+`next/image` is used with `images.unoptimized: true`. Security headers, including the content security policy, are set from `next.config.ts`. The policy allows MapTiler and the Turnstile script and frame. `worker-src 'self' blob:` lets the MapLibre worker start.
 
 ## Visual system
 
@@ -78,112 +116,81 @@ Clean and minimal, light only. No dark mode.
 - Muted text `#5E5A52`, hairline borders at 8% and 16% ink
 - Controls and inputs use a 6px radius. Cards, photos, and the map frame use 12px. No pills.
 - Buttons are shared class strings in `lib/ui.ts`: yellow primary, ink outline secondary, ink dark. Press scales to 0.98. Hover on the yellow button deepens to `#E3B500`.
-- Prices use tabular monospace and `Intl.NumberFormat` for `es-MX`.
+- Prices use tabular monospace.
 - Motion is short and eased (`cubic-bezier(0.16, 1, 0.3, 1)`). Every animation checks `prefers-reduced-motion` and renders the final state immediately when it is on.
 - Copy is Spanish (Mexico). UI chrome uses the lightning mark from `public/logo.svg`, not an emoji.
 
 The home hero is a brand statement, not a dashboard: one headline, one short support line, two actions ("Ver menú", "Pedir"), and one full-bleed food photograph. No stat strip, no badge row, no card grid in the first viewport.
 
+The order page has to stay usable on a phone. The builder, suggested plates, cart, and checkout are in normal document flow, so no part of the form sits under a fixed panel.
+
 ## Architecture
 
-Most of the site is server-rendered static HTML. Client JavaScript is limited to four islands:
+Marketing pages are server-rendered. Client JavaScript is limited to the interactions that need it: the mobile menu, the menu filters, the plate builder and cart, checkout, the map, auth forms, the receipt poll, and the kitchen board.
 
-- `Header` for the mobile menu
-- `MenuBrowser` for category tabs
-- `OrderForm` for validation and the WhatsApp handoff
-- `BrandMap` / `LocationsExplorer` / `MapTeaser` for the map
+An order is one database transaction: `orders`, frozen `order_line_items`, one `payments` row, and the first `order_status_events` row. Package lines are one priced header plus zero-price slot rows. The kitchen is copied from the pickup point at that moment. Guest carts live in Redis. Logged-in carts live in Postgres. Login moves the guest cart onto the user.
 
-`Reveal` is a small Motion wrapper. `onMount` fades the hero in on load. Everything else uses `whileInView` once, at 25% visibility.
-
-The order message is built in `lib/whatsapp.ts`, separate from the form, so the Spanish template and the MXN total have one definition. A general question, a pickup question, and a partner inquiry each have their own template and button.
+Because the session cookie is SameSite=Strict, the Openpay return cannot use the session. The success and cancel pages load by `order_ref`. Openpay has one redirect URL; a failed charge is sent from the success page to the cancel page.
 
 ## Map
 
-The locations page is a list plus a sticky map. On desktop the list is on the left and the map fills the right column. On mobile the map sits on top at `60dvh` and the list follows. Mobile turns on MapLibre cooperative gestures so a vertical swipe still scrolls the page; the first gesture on the map asks for two fingers.
+The locations page is a list plus a sticky map of the four kitchens. On desktop the list is on the left and the map fills the right column. On mobile the map sits on top at `60dvh` and the list follows. Mobile turns on MapLibre cooperative gestures so a vertical swipe still scrolls the page; the first gesture on the map asks for two fingers.
 
-The home teaser does not load MapLibre until the section is within 300px of the viewport (`IntersectionObserver`). It is non-interactive. A cream panel over the map links to `/ubicaciones`. Padding shifts with viewport width so the panel does not cover the pins.
+The home teaser does not load MapLibre until the section is within 300px of the viewport. It is non-interactive. A cream panel over the map links to `/ubicaciones`.
 
-Pickup markers are custom HTML: a 12px-radius black square with a yellow lightning icon, rendered with `createRoot` because MapLibre markers are DOM nodes, not React children. Popups show name, address, and hours. Selecting a point in the list highlights its marker and moves the camera. Reduced motion uses `jumpTo` instead of `flyTo`.
+Markers are custom HTML: a 12px-radius black square with a yellow lightning icon. Selecting a kitchen highlights its marker and moves the camera. Reduced motion uses `jumpTo` instead of `flyTo`.
 
-On `style.load`, `lib/map-style.ts` walks every MapTiler layer and repaints it: cream land, warm water and parks, white roads with hairline casings, ink labels with a cream halo. POI, transit, and building extrusions are hidden. Popup and zoom-control CSS in `globals.css` removes MapLibre's default shadow and matches the type and radius of the rest of the site. MapTiler and OpenStreetMap attribution stay visible.
+On `style.load`, `lib/map-style.ts` walks every MapTiler layer and repaints it: cream land, warm water and parks, white roads with hairline casings, ink labels with a cream halo. POI, transit, and building extrusions are hidden. If the MapTiler key is missing or WebGL fails, the same coordinates are drawn by an SVG fallback. The slot keeps its height so the page does not jump.
 
-If the MapTiler key is missing or WebGL fails, the same coordinates are drawn by `ZonesSketch`, a small SVG projection, with a WhatsApp link to ask about another pickup point. The slot keeps its height so the page does not jump.
-
-## Order form
-
-Fields: name, phone (at least 10 digits), delivery or pickup, zone plus street address or pickup point, dish quantities from 0 to 20, optional notes.
-
-Validation is inline. The first invalid field is focused. Submitting builds the message, opens it in a new tab, and swaps the form for a confirmation. If the browser blocks the popup, the UI says so and keeps a direct WhatsApp link with the same prefilled text, so the order is not lost. A "Nuevo pedido" action clears quantities and notes and returns to the form.
-
-Beside the form, three steps explain the offline payment: send the WhatsApp message, receive the bank details, then schedule delivery or pickup once the transfer lands. The page states outright that the site does not charge cards.
-
-## Security headers
-
-`public/_headers` is served with the static files:
-
-- `nosniff`, `DENY` framing, strict referrer, HSTS, and a locked-down permissions policy (no camera, microphone, or geolocation)
-- Content Security Policy locked to `'self'`, with MapTiler allowed for images and `connect-src`, and `worker-src 'self' blob:` so the MapLibre worker can start
+MapLibre's worker is copied into `public/maplibre` on install, dev, and build, and the map calls `setWorkerUrl` before `new Map()`. The worker files are gitignored because they come from `node_modules`.
 
 ## Experience from building it
 
 These are the parts worth putting on a portfolio. They are decisions and problems, not a feature list.
 
-### Match the business, then build the interface
+### Keep the sale where the kitchen already is
 
-The tempting version of this site is a cart and a payment provider. The useful version is a message the kitchen can read in WhatsApp. I kept scope there: no accounts, no inventory sync, no card gateway, no chatbot API. The form's success state is "your message is ready," and the page explains that money moves by transfer afterward. That is a product decision a portfolio should show, because it is why the site is small enough to be static and still complete.
+The tempting version is a cart that charges a card and a chatbot that confirms it. The live version still ends in WhatsApp and a transfer, because that is how this kitchen gets paid. The app's job is to make that order complete before the chat starts, then keep a record: who it is for, which kitchen cooks it, and whether the transfer has been marked paid. Card checkout is written and switched off, so the copy on the site does not promise a payment the business cannot take yet.
 
-### Static export changes what "Next.js" means
+### Price and assign the kitchen on the server
 
-The plan started with a normal Next.js server. Shipping on Cloudflare Workers static assets required `output: "export"`. That removed the image optimizer, server actions, and any runtime Node code. I treated that as a design constraint: pages stay as React server components that compile to HTML, client components stay few, and images are ordinary files with explicit `sizes`. The favicon still uses `ImageResponse`, but only because it is forced static at build time. Forgetting the Wrangler assets config (`directory: "./out"`) was enough to make a finished build undeployable. The deploy target has to be part of the app design, not a last step.
+A plate is five choices, and a package is a header plus slots. The browser can preview a price. Checkout loads the catalog again and writes frozen line items, so a tampered total or a retired protein does not become the order. The kitchen is copied from the pickup point in the same transaction. Delivery is rejected even if someone posts it while the button is disabled.
+
+### A guest can order without an account, and the order still has an owner
+
+A guest checkout does not insert a row. It stores the body on that browser's session. Registering or signing in on the same browser re-prices it and creates the order. Registration itself does not sign anyone in: Turnstile, then a confirmation email, then the link. If the mail send fails, no user is kept. The receipt link works without a session, because the payment return cannot send the Strict cookie.
+
+### One paid transition, one ticket, one message
+
+Staff move a WhatsApp order to paid. That step sets `paid_at`, marks the payment succeeded, and writes the ticket and the customer message in the same transaction. A second click, a duplicate webhook, or a later status change does not print or message again. An unconfigured mail sender or queue is stored as skipped, so turning it on later does not flush a backlog.
 
 ### A map inside a bundler is its own project
 
-MapLibre loads a web worker relative to its own module URL. Once Next bundles the library, that URL is wrong and the map dies quietly. The fix is operational, not cosmetic: a small Node script copies `maplibre-gl-worker.mjs` and the shared chunk it imports into `public/maplibre` on install, dev, and build, and the map calls `setWorkerUrl` before `new Map()`. The worker files are gitignored because they come from `node_modules`.
+MapLibre loads a web worker relative to its own module URL. Once Next bundles the library, that URL is wrong and the map dies quietly. The fix is a small Node script that copies the worker and the shared chunk it imports, plus `setWorkerUrl` before `new Map()`. Around that: dynamic import with `ssr: false`, a lazy home teaser, cooperative gestures on phones, `jumpTo` for reduced motion, React roots inside marker elements unmounted so React 19 does not warn during cleanup, a layer-walking recolor, a CSP that allows MapTiler and a same-origin worker, and an SVG fallback with the same coordinates.
 
-Around that, the map had to behave like the rest of the site:
+### Accessibility is part of the motion and the forms
 
-- Dynamic `import()` and `ssr: false`, because MapLibre touches `window` and WebGL.
-- Lazy mount on the home page so the hero does not pay for a map.
-- Cooperative gestures on phones.
-- `jumpTo` when the user prefers reduced motion.
-- React roots inside marker elements, unmounted on a microtask during cleanup so React 19 does not warn while the map is being destroyed.
-- A CSS pass and a layer-walking recolor, because the stock MapTiler style would have been a different brand in the middle of the page.
-- A CSP that allows MapTiler tiles and a same-origin worker. A strict `default-src 'self'` without those exceptions looks secure and breaks the map.
-- An SVG fallback using the same coordinates, so a missing API key or a failed WebGL context still shows the pickup points.
-
-### Simplify the map when the action changes
-
-The first map drew shaded delivery polygons for five zones. After using it, the clearer action was pickup: two points, a list, and a link that opens the order form already set to that point. I removed the polygons, the zone hover state, and the GeoJSON overlay. Zones stayed in the order form, where they answer "where do you deliver, and on which days?" The map answers a different question: "where do I pick up?" Splitting those jobs made both screens shorter. The deleted code was the point.
-
-### Accessibility is part of the motion and the form
-
-Reduced motion is checked in the reveal component, the menu filter, the form's success swap, and the map camera. The header traps body scroll while the mobile menu is open and closes on Escape and on navigation. The menu uses a tab pattern. Form errors sit on the fields, and the result panel is an `aria-live` region. Focus rings are ink on cream. The skip link is the first thing in the page. None of this is a separate "a11y pass." It is how the interactions were written.
-
-### A small design system beats restyling every page
-
-Tokens live in Tailwind v4 `@theme`: colors, two radii, the easing curve, and the three font roles. Buttons are three exported class strings. Pages compose those, so a yellow button on the home page and a yellow button on the order form are the same control. The palette is intentionally narrow. Cream, ink, and one yellow are enough for a food brand if type scale and photography do the work. I kept the hero free of cards and kept partner marks as simple geometric SVG shapes instead of fake logos.
-
-### Content as data, with an honest boundary
-
-Dishes, zones, pickup points, and message templates are typed TypeScript. Adding a dish is a data edit, and the menu page, the home strip, and the order form all read that list. I did not build a CMS for a catalog that is still being written. The portfolio should not imply this is a production menu or a signed partner list. The engineering is the system those real values can drop into.
+Reduced motion is checked in the reveal component, the menu filter, the suggested-plate expand, and the map camera. The header traps body scroll while the mobile menu is open and closes on Escape and on navigation. Form errors sit on the fields. The kitchen board and the receipt poll update in place. Focus rings are ink on cream. The skip link is the first thing in the page.
 
 ## Suggested portfolio framing
 
 **Title:** Power Meals
 
-**Subtitle:** Brand site and WhatsApp ordering for a Tijuana meal-prep kitchen
+**Subtitle:** Ordering platform for a Tijuana meal-prep kitchen, from plate builder to kitchen ticket
 
-**Tags:** Next.js, React, TypeScript, Tailwind CSS, MapLibre, static deployment, Cloudflare
+**Tags:** Next.js, React, TypeScript, Tailwind CSS, PostgreSQL, Redis, MapLibre
 
 **Highlight three things:**
 
-1. An order form that writes the WhatsApp message, including dish, zone, and pickup deep links, and still works when the popup is blocked.
-2. A brand-recolored MapLibre map that lazy-loads, respects reduced motion, and falls back to a drawn map of the same points.
-3. A static Next.js site on Cloudflare, with the image pipeline, worker bundling, and content security policy adjusted for a folder of files instead of a Node server.
+1. A plate builder that confirms one meal at a time, previews a price, and lets the server recompute the total and the kitchen at checkout. Pickup is the four kitchens on the map. Delivery cannot be submitted.
+2. A WhatsApp order that is not paid until staff say so, then prints one ticket and sends one receipt message. Guests claim that order by signing in on the same browser.
+3. A brand-recolored MapLibre map that lazy-loads, respects reduced motion, and falls back to a drawn map of the same four kitchens.
 
 ## Do not claim
 
 - Live sales, traffic, conversion, or a launched client engagement
-- Online payments, user accounts, or a real-time WhatsApp integration
-- That the menu, prices, partners, or pickup addresses are final business data
-- A custom backend or CMS
+- That card payment is available to customers, or that a WhatsApp order is paid when it is placed
+- That the site messages customers on WhatsApp today, or that a real kitchen printer has taken a ticket from AWS
+- That delivery is available
+- That the food photography, partner names, or case studies are final business assets
+- A production deploy on EC2 or `powermeals.mx`

@@ -1,6 +1,6 @@
 # Power Meals — remaining work
 
-The retail app is built and running locally: catalog and cart, WhatsApp orders, kitchen dashboard, receipt tracker, print outbox, and the paid-order notification outbox. This file is what is left. `power-meals.md` is the old static site. `power-meals-v2.md` is the original build prompt. [`.cursor/rules/application.mdc`](./.cursor/rules/application.mdc) is the runtime model. When they disagree, follow the code.
+The retail app is built and running locally: catalog and cart, WhatsApp orders, kitchen dashboard, receipt tracker, print outbox, and the paid-order notification outbox. This file is what is left. [`power-meals.md`](./power-meals.md) is the portfolio brief for the current app. `power-meals-v2.md` is the original build prompt. [`.cursor/rules/application.mdc`](./.cursor/rules/application.mdc) is the runtime model. When they disagree, follow the code.
 
 ## Already built
 
