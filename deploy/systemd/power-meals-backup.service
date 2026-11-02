@@ -1,0 +1,27 @@
+[Unit]
+Description=Power Meals: dump PostgreSQL to S3
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=powermeals
+Group=powermeals
+WorkingDirectory=/srv/power-meals
+EnvironmentFile=/srv/power-meals/.env
+Environment=NODE_ENV=production
+# Lets rsyslog copy this unit's JSON lines to /var/log/power-meals/app.log for CloudWatch (deploy/rsyslog).
+SyslogIdentifier=power-meals-backup
+# Same command as `npm run db:backup`; adjust the node path to match power-meals.service.
+# pg_dump comes from PATH (postgresql-client, same major version as the server or newer).
+ExecStart=/usr/bin/node node_modules/tsx/dist/cli.mjs --conditions=react-server scripts/backup-database.ts
+# The dump streams to S3, so this bounds the whole upload. Raise it if the database grows past a few GB.
+TimeoutStartSec=30min
+# Keep the site responsive while the dump runs.
+Nice=10
+IOSchedulingClass=idle
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict

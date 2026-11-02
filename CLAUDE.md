@@ -26,6 +26,7 @@ STAFF_PASSWORD=... npm run user:create-staff -- --email <email> --name <name> --
 npm run kitchen:dispatch    # retry the kitchen_dispatches outbox (SQS)
 npm run orders:notify       # retry the order_notifications outbox (email / WhatsApp)
 npm run ops:watchdog        # report failed/stuck outbox rows and stale paid orders (alert.* logs + heartbeat)
+npm run db:backup           # pg_dump streamed to s3://$BACKUP_S3_BUCKET (needs pg_dump on PATH and AWS credentials)
 ```
 
 Scripts that import app code run with `tsx --conditions=react-server` so `server-only` modules load outside Next. Timer scripts go through `scripts/run-job.ts` (Sentry, Healthchecks.io ping, closing Postgres and Redis).
@@ -55,7 +56,7 @@ npx playwright test e2e/ordering.spec.ts --project desktop
 - `drizzle/` — SQL migrations generated from `lib/db/schema.ts` by `npm run db:generate`.
 - `packages/print-daemon/` — separate Node package (own `package.json`) that consumes the SQS queue and prints 80mm tickets for one kitchen.
 - `scripts/` — CLI entry points behind the npm scripts above.
-- `deploy/`, `docs/ec2-setup.md` — EC2 deployment (systemd, nginx) and SQS printing setup.
+- `deploy/`, `docs/ec2-setup.md` — EC2 deployment (systemd, nginx), SQS printing setup, and backups and restore (section 11).
 
 ## Observability
 

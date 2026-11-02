@@ -235,6 +235,7 @@ Create one check per row and put its ping URL in the matching `.env` (the kitche
 | Notify retry timer | `HEARTBEAT_NOTIFY_URL` | 1 min | 5 min |
 | Dispatch retry timer | `HEARTBEAT_DISPATCH_URL` | 1 min | 5 min |
 | Watchdog | `HEARTBEAT_WATCHDOG_URL` | 5 min | 10 min |
+| Nightly database backup ([section 11](#11-backups)) | `HEARTBEAT_BACKUP_URL` | 1 day | 2 h |
 | One per kitchen printer | `HEARTBEAT_URL` (print daemon) | 1 min | 5 min |
 
 Add an email (or the free Telegram integration) to the project. The watchdog check also goes red when PostgreSQL or Redis is unreachable, because the run fails.
@@ -318,6 +319,153 @@ fields ts, event, orderId, message | filter level = "error" | sort ts desc | lim
 ### UptimeRobot
 
 `/api/health` only answers localhost (section 8), so from outside monitor the pages: a keyword monitor on `https://powermeals.mx/` for `Power Meals`, an HTTP monitor on `https://powermeals.mx/menu`, and SSL expiry alerts. Database and Redis outages are caught by the watchdog check above.
+
+## 11. Backups
+
+Two layers. Redis holds only sessions, carts and rate-limit counters, so it is not backed up; losing it signs everyone out.
+
+| Layer | What | When | Kept | Restores |
+|---|---|---|---|---|
+| `pg_dump` to S3 | Logical dump of the `powermeals` database (`--format=custom`) | 03:30 Tijuana time, nightly | 30 days | One database, on this or any other server |
+| EBS snapshots (Data Lifecycle Manager) | The whole encrypted data volume | Daily | 7 snapshots | The whole volume, as it was at snapshot time |
+
+The dump is the main backup: it is small, portable and tested by the restore drill. The snapshot covers what the dump does not, such as a broken instance or `.env` on the same volume.
+
+Neither layer holds `PASSWORD_PEPPER` separately. Keep it with the database credentials (section 2), outside AWS. A dump restored without the same pepper loads fine, but no one can log in.
+
+### S3 bucket
+
+Same region as `AWS_REGION`. Versioning makes a dump the instance overwrites recoverable, and the lifecycle rule deletes each dump 30 days after upload.
+
+```bash
+BUCKET=power-meals-backups-<account-id>    # bucket names are global
+aws s3api create-bucket --bucket "$BUCKET" --region "$AWS_REGION" \
+  --create-bucket-configuration LocationConstraint="$AWS_REGION"
+aws s3api put-public-access-block --bucket "$BUCKET" --public-access-block-configuration \
+  BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+aws s3api put-bucket-encryption --bucket "$BUCKET" --server-side-encryption-configuration \
+  '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+aws s3api put-bucket-versioning --bucket "$BUCKET" --versioning-configuration Status=Enabled
+aws s3api put-bucket-lifecycle-configuration --bucket "$BUCKET" --lifecycle-configuration '{
+  "Rules": [{
+    "ID": "postgres-30-days",
+    "Filter": { "Prefix": "postgres/" },
+    "Status": "Enabled",
+    "Expiration": { "Days": 30 },
+    "NoncurrentVersionExpiration": { "NoncurrentDays": 7 },
+    "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
+  }]
+}'
+```
+
+`Expiration` deletes a dump after 30 days. `NoncurrentVersionExpiration` removes the older version left behind by that delete, or by an overwrite, a week later. `AbortIncompleteMultipartUpload` removes the parts of an upload that was killed partway.
+
+### Instance role
+
+Add this inline policy to the EC2 instance role. Write and read cover the nightly upload and the restore drill. There is no `s3:DeleteObject`, so the server cannot delete its own backups; only the lifecycle rule deletes them.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PowerMealsBackupObjects",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:AbortMultipartUpload"],
+      "Resource": "arn:aws:s3:::power-meals-backups-<account-id>/postgres/*"
+    },
+    {
+      "Sid": "PowerMealsBackupList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::power-meals-backups-<account-id>",
+      "Condition": { "StringLike": { "s3:prefix": "postgres/*" } }
+    }
+  ]
+}
+```
+
+### Nightly dump timer
+
+`pg_dump` comes from `postgresql-client` and must be the same major version as the server or newer. On Ubuntu, the `postgresql` package already installs it. The dump streams straight to S3 and is never written to disk. If `pg_dump` fails, the upload is aborted, so a partial file never sits in the bucket looking like a good backup.
+
+1. Set `BACKUP_S3_BUCKET` (and `BACKUP_S3_PREFIX` if it is not `postgres/`) and `HEARTBEAT_BACKUP_URL` in `.env`.
+2. Install the timer and run it once:
+
+   ```bash
+   sudo cp deploy/systemd/power-meals-backup.service deploy/systemd/power-meals-backup.timer /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now power-meals-backup.timer
+   sudo systemctl start power-meals-backup.service      # one run now; blocks until the upload finishes
+   journalctl -u power-meals-backup -n 20              # db.backup.uploaded with key, bytes and seconds
+   systemctl list-timers power-meals-backup.timer      # next run
+   ```
+
+A failed run logs `db.backup.crashed` (a CloudWatch `level = "error"` line), reports the error to Sentry and pings the check's `/fail`. A run that never happens (timer disabled, instance off past the grace time) turns the check red on its own.
+
+### EBS snapshots (Data Lifecycle Manager)
+
+Tag the volume that holds `/var/lib/postgresql` (the root volume, if PostgreSQL was not moved) and let DLM snapshot it every day:
+
+```bash
+aws ec2 create-tags --resources <vol-id> --tags Key=Backup,Value=power-meals
+aws dlm create-default-role --resource-type snapshot      # once per account; creates AWSDataLifecycleManagerDefaultRole
+aws dlm create-lifecycle-policy --description "power-meals daily" --state ENABLED \
+  --execution-role-arn arn:aws:iam::<account-id>:role/AWSDataLifecycleManagerDefaultRole \
+  --policy-details '{
+    "PolicyType": "EBS_SNAPSHOT_MANAGEMENT",
+    "ResourceTypes": ["VOLUME"],
+    "TargetTags": [{ "Key": "Backup", "Value": "power-meals" }],
+    "Schedules": [{
+      "Name": "daily",
+      "CreateRule": { "Interval": 24, "IntervalUnit": "HOURS", "Times": ["11:00"] },
+      "RetainRule": { "Count": 7 },
+      "CopyTags": true
+    }]
+  }'
+```
+
+`Times` is UTC. 11:00 UTC is 03:00 or 04:00 in Tijuana, depending on daylight saving time. Snapshots of an encrypted volume are encrypted too. A snapshot is crash-consistent: PostgreSQL starts from it the same way it starts after a power cut, replaying its WAL. That works because the data directory and WAL are on the same volume.
+
+### Restore procedure
+
+**Find a dump.** Keys are dated in UTC: `postgres/YYYY/MM/DD/powermeals-<time>Z.dump`. The AWS CLI is not part of the app; install it with `sudo snap install aws-cli --classic`.
+
+```bash
+BUCKET=power-meals-backups-<account-id>
+aws s3 ls "s3://$BUCKET/postgres/" --recursive | tail -n 5
+KEY=postgres/2026/11/02/powermeals-2026-11-02T10-30-05Z.dump
+aws s3 cp "s3://$BUCKET/$KEY" /var/tmp/restore.dump
+pg_restore --list /var/tmp/restore.dump > /dev/null && echo "archive OK"
+```
+
+**Restore into a scratch database (the drill; touches nothing live).** Do this after setup and every few months:
+
+```bash
+sudo -u postgres createdb -O powermeals powermeals_restore
+sudo -u postgres pg_restore --dbname=powermeals_restore --no-owner --role=powermeals --exit-on-error /var/tmp/restore.dump
+sudo -u postgres psql powermeals_restore -c "select count(*) as orders, max(created_at) as latest from orders"
+sudo -u postgres dropdb powermeals_restore
+rm /var/tmp/restore.dump
+```
+
+`latest` should be from the evening before the dump.
+
+**Replace the live database.** Orders placed after the dump are lost, so take the newest dump. If PostgreSQL itself is still up, take a fresh dump first with `sudo systemctl start power-meals-backup.service`. Stop everything that writes, keep the broken database under another name, then restore:
+
+```bash
+sudo systemctl stop power-meals power-meals-notify.timer power-meals-dispatch.timer power-meals-watchdog.timer power-meals-backup.timer
+sudo -u postgres psql -c "alter database powermeals rename to powermeals_broken_$(date +%Y%m%d)"
+sudo -u postgres createdb -O powermeals powermeals
+sudo -u postgres pg_restore --dbname=powermeals --no-owner --role=powermeals --exit-on-error /var/tmp/restore.dump
+cd /srv/power-meals && sudo -u powermeals npm run db:migrate   # no-op unless the dump predates a migration
+sudo systemctl start power-meals power-meals-notify.timer power-meals-dispatch.timer power-meals-watchdog.timer power-meals-backup.timer
+curl -s http://127.0.0.1:3000/api/health
+```
+
+Check `/kitchen/dashboard` and one receipt. Drop `powermeals_broken_*` once you are sure it is not needed. Redis sessions still point at user ids from the old database. They stay valid as long as the users exist in the dump. Otherwise, `redis-cli -a '<password>' -n 0 flushdb` signs everyone out.
+
+**Restore a whole volume (instance or disk lost).** In the EC2 console, find the newest snapshot tagged `Backup=power-meals`. Create a volume from it in the instance's availability zone, with encryption on. Then either attach it to a replacement instance in place of the lost volume, or attach it as a second disk and copy what is needed off it. PostgreSQL replays its WAL on first start. If the snapshot is older than the newest S3 dump, restore that dump on top using the steps above.
 
 ## Cloudflare static deploy
 
