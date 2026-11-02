@@ -24,7 +24,7 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 ### Code
 
 - [x] **Database backups.** Nightly `pg_dump` to S3 (30 days), a systemd timer that pings its own Healthchecks.io check, and a written restore procedure. EBS snapshots through Data Lifecycle Manager as a second layer. See [`docs/ec2-setup.md`](./docs/ec2-setup.md#11-backups)
-- [ ] **Deploy script.** `scripts/deploy.sh`: check the required env vars, `npm ci`, migrate, build, restart, wait for `/api/health`, and keep the previous build to roll back to.
+- [x] **Deploy script.** `scripts/deploy.sh`: check the required env vars, `npm ci`, migrate, build, restart, wait for `/api/health`, and keep the previous build to roll back to. Releases under `/srv/power-meals/releases`, see [`docs/ec2-setup.md`](./docs/ec2-setup.md#6-deploy)
 - [ ] **Nginx client IP behind CloudFront.** Fill in `set_real_ip_from` in [`deploy/nginx/powermeals.conf`](./deploy/nginx/powermeals.conf). Without it every rate limit, including 5 logins a minute, is shared by everyone behind the same CloudFront edge.
 - [ ] **Builder dropdowns before hydration.** A Base or Proteína picked before React hydrates `/pedido` is reset to empty (found by the Playwright test). Keep the dropdowns disabled until the page is interactive.
 - [ ] **Aviso de privacidad.** `/aviso-de-privacidad`, linked from the footer, `/registro` and checkout. The text comes from a lawyer or a reviewed template.

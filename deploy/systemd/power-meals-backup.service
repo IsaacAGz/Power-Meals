@@ -7,8 +7,8 @@ Wants=network-online.target
 Type=oneshot
 User=powermeals
 Group=powermeals
-WorkingDirectory=/srv/power-meals
-EnvironmentFile=/srv/power-meals/.env
+WorkingDirectory=/srv/power-meals/current
+EnvironmentFile=/srv/power-meals/shared/.env
 Environment=NODE_ENV=production
 # Lets rsyslog copy this unit's JSON lines to /var/log/power-meals/app.log for CloudWatch (deploy/rsyslog).
 SyslogIdentifier=power-meals-backup

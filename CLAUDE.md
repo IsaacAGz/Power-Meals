@@ -56,7 +56,7 @@ npx playwright test e2e/ordering.spec.ts --project desktop
 - `drizzle/` — SQL migrations generated from `lib/db/schema.ts` by `npm run db:generate`.
 - `packages/print-daemon/` — separate Node package (own `package.json`) that consumes the SQS queue and prints 80mm tickets for one kitchen.
 - `scripts/` — CLI entry points behind the npm scripts above.
-- `deploy/`, `docs/ec2-setup.md` — EC2 deployment (systemd, nginx), SQS printing setup, and backups and restore (section 11).
+- `deploy/`, `docs/ec2-setup.md` — EC2 deployment (systemd, nginx), SQS printing setup, and backups and restore (section 11). `scripts/deploy.sh` deploys on the server into `/srv/power-meals/releases/` with a `current` symlink and handles rollback; migrations run before the switch, so they must stay compatible with the release still running.
 
 ## Observability
 

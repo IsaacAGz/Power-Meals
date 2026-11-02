@@ -13,23 +13,43 @@ flowchart LR
 
 ## 1. App user and layout
 
+```
+/srv/power-meals/
+  repo.git/                 mirror of the GitHub repo, fetched on every deploy
+  shared/.env               the only .env; each release links to it
+  releases/<n>-<UTC time>-<sha>/  one per deploy: source, node_modules, .next (the newest 5 are kept)
+  current -> releases/...   the running release; every systemd unit runs from here
+```
+
 ```bash
 sudo useradd --system --no-create-home --home-dir /srv/power-meals --shell /usr/sbin/nologin powermeals
-sudo install -d -o powermeals -g powermeals /srv/power-meals
-sudo -u powermeals git clone <repo-url> /srv/power-meals
+sudo install -d -o powermeals -g powermeals /srv/power-meals /srv/power-meals/shared /srv/power-meals/releases
+```
+
+The server pulls from GitHub with a read-only **deploy key** (repository → Settings → Deploy keys, write access off):
+
+```bash
+sudo install -d -m 700 -o powermeals -g powermeals /srv/power-meals/.ssh
+sudo -u powermeals ssh-keygen -t ed25519 -N '' -C power-meals-deploy -f /srv/power-meals/.ssh/id_ed25519
+sudo cat /srv/power-meals/.ssh/id_ed25519.pub     # paste into the deploy key
+sudo -u powermeals git clone --mirror git@github.com:<owner>/<repo>.git /srv/power-meals/repo.git
 ```
 
 Node 22.9 or newer is required (`.node-version` pins 22; `db:seed` relies on `--env-file-if-exists`).
 
+From section 6 on, commands with a relative path (`deploy/...`, `npm run ...`) run from `/srv/power-meals/current`.
+
 ## 2. Secrets
 
 ```bash
-sudo -u powermeals cp /srv/power-meals/.env.example /srv/power-meals/.env
-sudo -u powermeals nano /srv/power-meals/.env
-sudo chmod 600 /srv/power-meals/.env
+sudo -u powermeals git --git-dir=/srv/power-meals/repo.git show main:.env.example | sudo -u powermeals tee /srv/power-meals/shared/.env >/dev/null
+sudo chmod 600 /srv/power-meals/shared/.env
+sudo -u powermeals nano /srv/power-meals/shared/.env
 ```
 
-The systemd unit loads this file through `EnvironmentFile`. Nothing secret lives in the repo or in the unit file.
+The systemd units load this file through `EnvironmentFile`, and each release has a `.env` symlink to it for the `npm run` scripts. Nothing secret lives in the repo or in the unit files. The deploy script checks it before every build (`scripts/check-deploy-env.mjs`): a missing launch variable, a `CHANGE_ME` left from the example, a short pepper, or a non-https `NEXT_PUBLIC_SITE_URL` stops the deploy; missing monitoring or backup variables only print a warning.
+
+After editing it: a `NEXT_PUBLIC_*` variable is inlined at build time, so run a deploy (section 6). For any other variable, `sudo systemctl restart power-meals` is enough, and the timers read the file on their next run.
 
 `PASSWORD_PEPPER` (`openssl rand -base64 32`) is mixed into every password hash. If it is lost or changed, nobody can log in, so back it up alongside the database credentials.
 
@@ -94,33 +114,58 @@ No rules for 5432, 6379, or 3000. Both data stores also bind to localhost, so a 
 
 ## 6. Deploy
 
+[`scripts/deploy.sh`](../scripts/deploy.sh) does every deploy, as root:
+
 ```bash
-cd /srv/power-meals
-sudo -u powermeals git pull
-sudo -u powermeals npm ci
-sudo -u powermeals npm run db:migrate
-sudo -u powermeals npm run db:seed        # idempotent upsert of catalog, zones, pickup points, kitchens
-sudo -u powermeals npm run build
-sudo systemctl restart power-meals
+sudo /srv/power-meals/current/scripts/deploy.sh            # main
+sudo /srv/power-meals/current/scripts/deploy.sh <ref>      # a branch, tag or sha
 ```
 
-First install of the service:
+1. Fetches the mirror and exports the commit into a new `releases/<number>-<UTC time>-<sha>/` (no `.git`; the sha is in `REVISION`).
+2. Checks `shared/.env` (section 2).
+3. `npm ci`, `npm run build`, then `npm run db:migrate`. The running release keeps serving all this time. If any step fails, the new release is deleted and nothing else changes.
+4. Updates the systemd unit files that are already installed and changed, and lists the ones that are not installed.
+5. Points `current` at the new release, restarts `power-meals` and waits up to 60 s for `/api/health` to answer 200. The timers pick up `current` on their next run.
+6. If the health check fails, it marks the release bad, switches back to the previous one, restarts and exits with an error.
+7. Deletes all but the newest 5 releases.
+
+Only one deploy or rollback runs at a time.
+
+**Migrations run before the switch**, so the release that is still running must keep working with the new schema: add columns and tables in one deploy, and stop using or drop the old ones in a later one. Neither a rollback nor a failed health check undoes a migration. The deploy does not take a backup. Before a deploy whose migration changes or drops data, take one by hand with `sudo systemctl start power-meals-backup.service`. Restoring that dump (section 11) is the only way to undo the migration.
+
+**Rollback** switches back to the newest earlier release that was not marked bad, without building. The release it leaves is marked bad, so a second rollback goes further back instead of returning to it:
 
 ```bash
+sudo /srv/power-meals/current/scripts/deploy.sh list               # releases, with current and bad marked
+sudo /srv/power-meals/current/scripts/deploy.sh rollback           # previous good release
+sudo /srv/power-meals/current/scripts/deploy.sh rollback <name>    # a specific one
+```
+
+To go forward again, deploy the ref again: a new release is built from it.
+
+**First deploy.** There is no `current` yet, so run the script from the mirror. Until `power-meals.service` is installed it only builds and switches `current`, without restarting anything. Then install the service, seed, and deploy once more the normal way:
+
+```bash
+sudo -u powermeals git --git-dir=/srv/power-meals/repo.git show main:scripts/deploy.sh > /tmp/deploy.sh
+sudo bash /tmp/deploy.sh main
+cd /srv/power-meals/current
 sudo cp deploy/systemd/power-meals.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now power-meals
+curl -s http://127.0.0.1:3000/api/health
+sudo -u powermeals npm run db:seed        # idempotent upsert of catalog, zones, pickup points, kitchens
+sudo /srv/power-meals/current/scripts/deploy.sh   # a normal deploy, to confirm the script end to end
 journalctl -u power-meals -f
 ```
 
-`db:seed` is safe to re-run: it upserts by slug and never deletes rows, except that each seeded meal template's filter tags are replaced with the ones in [`lib/catalog/seed-data.ts`](../lib/catalog/seed-data.ts). Zone and pickup-point routing to kitchens can be changed directly in the database; re-seeding does not overwrite `kitchen_facility_id` on existing zones or points.
+`db:seed` is not part of the deploy. Run it from `/srv/power-meals/current` after a deploy that changes [`lib/catalog/seed-data.ts`](../lib/catalog/seed-data.ts). It is safe to re-run: it upserts by slug and never deletes rows, except that each seeded meal template's filter tags are replaced with the ones in [`lib/catalog/seed-data.ts`](../lib/catalog/seed-data.ts). Zone and pickup-point routing to kitchens can be changed directly in the database; re-seeding does not overwrite `kitchen_facility_id` on existing zones or points.
 
 ### Kitchen staff accounts
 
 Staff can't self-register. Create each account for one kitchen (`zona-rio`, `otay`, `plaza-monarca`, `rio-tijuana-3ra-etapa`):
 
 ```bash
-cd /srv/power-meals
+cd /srv/power-meals/current
 read -rs STAFF_PASSWORD && export STAFF_PASSWORD   # typed without echo, kept out of shell history
 sudo -u powermeals --preserve-env=STAFF_PASSWORD npm run user:create-staff -- \
   --email cocina.otay@powermeals.mx --name "Cocina Otay" --facility otay
@@ -220,7 +265,7 @@ Each tool covers one question. All of them are free or cost a few dollars a mont
 
 ### Sentry
 
-1. Create a Next.js project in Sentry. Set `NEXT_PUBLIC_SENTRY_DSN` in `.env` (and `NEXT_PUBLIC_SENTRY_ENVIRONMENT=staging` on a staging box), then rebuild: the DSN is inlined into the browser bundle.
+1. Create a Next.js project in Sentry. Set `NEXT_PUBLIC_SENTRY_DSN` in `.env` (and `NEXT_PUBLIC_SENTRY_ENVIRONMENT=staging` on a staging box), then deploy again (section 6): the DSN is inlined into the browser bundle.
 2. Optional: set `SENTRY_ORG`, `SENTRY_PROJECT` and `SENTRY_AUTH_TOKEN` (an org token with source map upload) so `npm run build` uploads source maps and removes them from `.next`.
 3. Browser errors go to `/monitoring` on this site and the server forwards them, so the CSP is unchanged. Add the `/monitoring*` CloudFront behavior from section 9.
 
@@ -458,7 +503,7 @@ sudo systemctl stop power-meals power-meals-notify.timer power-meals-dispatch.ti
 sudo -u postgres psql -c "alter database powermeals rename to powermeals_broken_$(date +%Y%m%d)"
 sudo -u postgres createdb -O powermeals powermeals
 sudo -u postgres pg_restore --dbname=powermeals --no-owner --role=powermeals --exit-on-error /var/tmp/restore.dump
-cd /srv/power-meals && sudo -u powermeals npm run db:migrate   # no-op unless the dump predates a migration
+cd /srv/power-meals/current && sudo -u powermeals npm run db:migrate   # no-op unless the dump predates a migration
 sudo systemctl start power-meals power-meals-notify.timer power-meals-dispatch.timer power-meals-watchdog.timer power-meals-backup.timer
 curl -s http://127.0.0.1:3000/api/health
 ```
