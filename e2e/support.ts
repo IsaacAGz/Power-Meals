@@ -32,10 +32,13 @@ export async function signIn(page: Page, user: { email: string; password: string
 
 /** Builds and confirms one plate in the open row of the Arma tu platillo builder. */
 export async function confirmPlate(page: Page, plate: { base: string; protein: string; price: string }) {
-  await page.getByLabel("Base").selectOption({ label: plate.base });
-  await page.getByLabel("Proteína").selectOption({ label: plate.protein });
   const confirm = page.getByRole("button", { name: `Confirmar · ${plate.price}` });
-  await expect(confirm).toBeEnabled();
+  // A pick made before React hydrates the page is reset to the empty option, so pick again until it sticks.
+  await expect(async () => {
+    await page.getByLabel("Base").selectOption({ label: plate.base });
+    await page.getByLabel("Proteína").selectOption({ label: plate.protein });
+    await expect(confirm).toBeEnabled({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
   await confirm.click();
   await expect(page.getByRole("button", { name: /^Confirmar$/ })).toBeDisabled();
 }

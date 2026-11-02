@@ -8,6 +8,9 @@ async function fillPickup(page: import("@playwright/test").Page) {
 }
 
 test("a guest builds plates and sends a written order to WhatsApp without creating one", async ({ page }) => {
+  // The database is reset once per run and other tests add orders, so compare against the count before this one.
+  const countOrders = async () => (await db().query("select count(*)::int as n from orders")).rows[0].n as number;
+  const ordersBefore = await countOrders();
   await page.goto("/pedido");
   await confirmPlate(page, { base: "Arroz", protein: "Pollo", price: "$139" });
   await confirmPlate(page, { base: "Camote", protein: "Salmón", price: "$214" });
@@ -22,8 +25,7 @@ test("a guest builds plates and sends a written order to WhatsApp without creati
   expect(message).toContain("Punto: Otay");
   expect(message).toContain("Pollo + arroz + veggies · Regular");
   expect(message).toContain("Total estimado: $353 MXN");
-  const { rows } = await db().query("select count(*)::int as n from orders");
-  expect(rows[0].n).toBe(0);
+  expect(await countOrders()).toBe(ordersBefore);
 });
 
 test("a suggested plate fills the open row without adding it", async ({ page }) => {
