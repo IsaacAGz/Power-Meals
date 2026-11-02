@@ -10,6 +10,8 @@ Group=powermeals
 WorkingDirectory=/srv/power-meals
 EnvironmentFile=/srv/power-meals/.env
 Environment=NODE_ENV=production
+# Lets rsyslog copy this unit's JSON lines to /var/log/power-meals/app.log for CloudWatch (deploy/rsyslog).
+SyslogIdentifier=power-meals
 # Adjust the node path if Node is installed via nvm or another manager (check with `which node`).
 ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
 Restart=on-failure

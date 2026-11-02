@@ -47,6 +47,8 @@ On a Windows PC, run `npm start` from the install folder as a service (for examp
 
 The poll loop never sleeps for a backoff: a failed ticket waits on the queue side while the daemon keeps receiving. Each line of output is JSON (`printed`, `print_failed`, `duplicate`, `receive_failed`) for `journalctl`.
 
+With `HEARTBEAT_URL` set (a Healthchecks.io check for this kitchen), the daemon pings it every minute while it can reach SQS, and pings `/fail` from a print failure until the next ticket prints. No ping for a few minutes means the PC, the daemon or its network is down.
+
 ## Ticket contract
 
 The message body is the `KitchenTicket` type in [`src/contract.ts`](src/contract.ts), which the web app imports too. Message attributes `kitchen_facility_id` and `order_id` carry the routing key and the order for tracing.

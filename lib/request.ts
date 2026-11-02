@@ -11,6 +11,11 @@ export function clientIpFromHeaders(headers: Headers): string {
   return forwarded || "unknown";
 }
 
+/** Nginx's $request_id, also written to its access log, so an app log line can be matched to the request. */
+export function requestId(request: Request): string | undefined {
+  return request.headers.get("x-request-id")?.trim() || undefined;
+}
+
 export function siteUrl(): string {
   const value = process.env.NEXT_PUBLIC_SITE_URL;
   if (!value) throw new Error("Missing required environment variable NEXT_PUBLIC_SITE_URL");

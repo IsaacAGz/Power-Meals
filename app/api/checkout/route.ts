@@ -6,8 +6,9 @@ import { abandonOrder, attachChargeToOrder, createPendingOrder } from "@/lib/ord
 import { resolveFulfillment } from "@/lib/orders/fulfillment";
 import { rememberCheckoutCart } from "@/lib/orders/payment";
 import { receiptPath } from "@/lib/orders/ref";
+import { errorMessage, log } from "@/lib/log";
 import { hitRateLimit } from "@/lib/rate-limit";
-import { clientIp, isSameOrigin, readJsonBody, siteUrl } from "@/lib/request";
+import { clientIp, isSameOrigin, readJsonBody, requestId, siteUrl } from "@/lib/request";
 
 const fail = (status: number, body: Record<string, unknown>) => Response.json({ ok: false, ...body }, { status });
 
@@ -59,19 +60,17 @@ export async function POST(request: Request) {
     await attachChargeToOrder(order.id, charge.id);
     if (!owner.userId) await rememberCheckoutCart(order.publicOrderRef, owner.sessionId);
 
-    console.info(JSON.stringify({ event: "checkout.charge_created", orderId: order.id, chargeId: charge.id }));
+    log.info("checkout.charge_created", { requestId: requestId(request), orderId: order.id, chargeId: charge.id });
     return Response.json({ ok: true, redirectUrl: charge.paymentUrl });
   } catch (error) {
     await abandonOrder(order.id);
-    console.error(
-      JSON.stringify({
-        event: "checkout.charge_failed",
-        orderId: order.id,
-        status: error instanceof OpenpayError ? error.status : undefined,
-        errorCode: error instanceof OpenpayError ? error.errorCode : undefined,
-        message: error instanceof Error ? error.message : String(error),
-      }),
-    );
+    log.error("checkout.charge_failed", {
+      requestId: requestId(request),
+      orderId: order.id,
+      status: error instanceof OpenpayError ? error.status : undefined,
+      errorCode: error instanceof OpenpayError ? error.errorCode : undefined,
+      message: errorMessage(error),
+    });
     return fail(502, { message: "No pudimos iniciar el pago con Openpay. Intenta de nuevo o envía tu pedido por WhatsApp." });
   }
 }

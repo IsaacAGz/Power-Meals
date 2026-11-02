@@ -1,0 +1,12 @@
+# /etc/logrotate.d/power-meals — the CloudWatch agent has shipped each line within seconds; this only bounds disk use.
+/var/log/power-meals/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    postrotate
+        /usr/lib/rsyslog/rsyslog-rotate
+    endscript
+}

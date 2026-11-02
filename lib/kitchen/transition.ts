@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import { getDb, schema, type Database } from "@/lib/db";
+import { log } from "@/lib/log";
 import { queueOrderNotification } from "@/lib/orders/notify";
 import { queueKitchenTicket } from "./dispatch";
 import { KITCHEN_STATUSES, nextKitchenStep, type KitchenStatus } from "./types";
@@ -63,7 +64,7 @@ export async function advanceKitchenOrderStatus(
   });
 
   if (outcome.ok && outcome.becamePaid) {
-    console.info(JSON.stringify({ event: "kitchen.order_paid", orderId, facilityId }));
+    log.info("kitchen.order_paid", { orderId, facilityId });
   }
   return outcome;
 }

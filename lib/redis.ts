@@ -12,3 +12,9 @@ export function getRedis(): Redis {
   }
   return globalForRedis.redis;
 }
+
+/** For scripts: closes the client only if something opened it, so the process can exit. */
+export function closeRedis() {
+  globalForRedis.redis?.disconnect();
+  globalForRedis.redis = undefined;
+}

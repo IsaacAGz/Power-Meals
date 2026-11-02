@@ -9,6 +9,7 @@ export type Config = {
   checkPaperStatus: boolean;
   retryVisibilitySeconds: number;
   otherFacilityVisibilitySeconds: number;
+  heartbeatUrl: string | undefined;
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -47,5 +48,6 @@ export function loadConfig(): Config {
     ...loadPrinterConfig(),
     retryVisibilitySeconds: integer("PRINT_RETRY_VISIBILITY_SECONDS", 120, 60, 300),
     otherFacilityVisibilitySeconds: integer("OTHER_FACILITY_VISIBILITY_SECONDS", 5, 0, 300),
+    heartbeatUrl: process.env.HEARTBEAT_URL || undefined,
   };
 }

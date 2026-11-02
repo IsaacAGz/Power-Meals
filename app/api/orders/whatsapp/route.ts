@@ -4,8 +4,9 @@ import { readCheckoutInput, validateCheckout } from "@/lib/orders/checkout-input
 import { createWhatsAppOrder } from "@/lib/orders/create";
 import { resolveFulfillment } from "@/lib/orders/fulfillment";
 import { rememberWhatsAppOrder } from "@/lib/orders/whatsapp";
+import { log } from "@/lib/log";
 import { hitRateLimit } from "@/lib/rate-limit";
-import { clientIp, isSameOrigin, readJsonBody } from "@/lib/request";
+import { clientIp, isSameOrigin, readJsonBody, requestId } from "@/lib/request";
 
 const fail = (status: number, body: Record<string, unknown>) => Response.json({ ok: false, ...body }, { status });
 
@@ -52,6 +53,6 @@ export async function POST(request: Request) {
     notes: input.notas || null,
     lines,
   });
-  console.info(JSON.stringify({ event: "whatsapp.order_created", orderId: order.id, userId: user.id }));
+  log.info("whatsapp.order_created", { requestId: requestId(request), orderId: order.id, userId: user.id });
   return Response.json({ ok: true, saved: true });
 }

@@ -1,0 +1,22 @@
+[Unit]
+Description=Power Meals: report failed or stuck orders, messages and kitchen tickets
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=powermeals
+Group=powermeals
+WorkingDirectory=/srv/power-meals
+EnvironmentFile=/srv/power-meals/.env
+Environment=NODE_ENV=production
+# Lets rsyslog copy this unit's JSON lines to /var/log/power-meals/app.log for CloudWatch (deploy/rsyslog).
+SyslogIdentifier=power-meals-watchdog
+# Same command as `npm run ops:watchdog`; adjust the node path to match power-meals.service.
+ExecStart=/usr/bin/node node_modules/tsx/dist/cli.mjs --conditions=react-server scripts/watchdog.ts
+TimeoutStartSec=120
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict

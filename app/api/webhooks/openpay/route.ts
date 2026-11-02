@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { errorMessage, log } from "@/lib/log";
 import { getCharge, isOpenpayConfigured, OpenpayError, type Charge } from "@/lib/openpay";
 import {
   recordChargeFailed,
@@ -10,8 +11,8 @@ import {
 
 const TRANSACTION_ID_PATTERN = /^[A-Za-z0-9]{1,64}$/;
 
-function log(fields: Record<string, unknown>) {
-  console.info(JSON.stringify({ event: "openpay.webhook", ...fields }));
+function logWebhook(fields: Record<string, unknown>) {
+  log.info("openpay.webhook", fields);
 }
 
 function safeEqual(a: string, b: string) {
@@ -44,7 +45,7 @@ function redact(body: Record<string, unknown>, transaction: Record<string, unkno
 
 export async function POST(request: Request) {
   if (!authorized(request)) {
-    log({ outcome: "unauthorized" });
+    logWebhook({ outcome: "unauthorized" });
     return new Response("Unauthorized", { status: 401, headers: { "WWW-Authenticate": 'Basic realm="openpay"' } });
   }
 
@@ -58,18 +59,18 @@ export async function POST(request: Request) {
 
   // Registering the webhook in the Openpay dashboard asks for this code.
   if (eventType === "verification") {
-    log({ type: eventType, verificationCode: body.verification_code });
+    logWebhook({ type: eventType, verificationCode: body.verification_code });
     return Response.json({ ok: true });
   }
 
   const transaction = (typeof body.transaction === "object" && body.transaction) as Record<string, unknown> | false;
   const transactionId = transaction ? String(transaction.id ?? "") : "";
   if (!eventType || !transaction || !TRANSACTION_ID_PATTERN.test(transactionId)) {
-    log({ type: eventType, outcome: "malformed" });
+    logWebhook({ type: eventType, outcome: "malformed" });
     return Response.json({ ok: false }, { status: 400 });
   }
   if (!isOpenpayConfigured()) {
-    log({ type: eventType, transactionId, outcome: "not_configured" });
+    logWebhook({ type: eventType, transactionId, outcome: "not_configured" });
     return Response.json({ ok: false }, { status: 503 });
   }
 
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
     if (error instanceof OpenpayError && error.status === 404) {
       charge = null;
     } else {
-      log({ type: eventType, transactionId, outcome: "lookup_failed", message: error instanceof Error ? error.message : String(error) });
+      logWebhook({ type: eventType, transactionId, outcome: "lookup_failed", message: errorMessage(error) });
       return Response.json({ ok: false }, { status: 502 });
     }
   }
@@ -101,9 +102,9 @@ export async function POST(request: Request) {
     outcome = await recordOtherEvent(charge, event);
   }
 
-  log({ type: eventType, transactionId, orderRef: charge?.orderId, chargeStatus: charge?.status, outcome });
+  logWebhook({ type: eventType, transactionId, orderRef: charge?.orderId, chargeStatus: charge?.status, outcome });
   if (outcome === "amount_mismatch") {
-    console.error(JSON.stringify({ event: "openpay.amount_mismatch", transactionId, orderRef: charge?.orderId }));
+    log.error("openpay.amount_mismatch", { transactionId, orderRef: charge?.orderId });
   }
   return Response.json({ ok: true, outcome });
 }

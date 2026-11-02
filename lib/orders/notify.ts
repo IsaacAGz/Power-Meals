@@ -1,6 +1,7 @@
 import "server-only";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb, schema, type Database } from "@/lib/db";
+import { log } from "@/lib/log";
 import { isOrderEmailConfigured, sendOrderEmail } from "@/lib/email";
 import { receiptPath } from "@/lib/orders/ref";
 import { isWhatsAppConfigured, sendWhatsAppTemplate, whatsAppRecipient } from "@/lib/whatsapp-cloud";
@@ -11,10 +12,6 @@ export type NotifyResult = "sent" | "pending" | "failed" | "not_pending";
 
 // The retry timer runs every minute, so this is roughly an hour of retries before the row is failed.
 const MAX_ATTEMPTS = 60;
-
-function log(fields: Record<string, unknown>) {
-  console.info(JSON.stringify({ event: "order.notify", ...fields }));
-}
 
 function receiptUrl(ref: string): string {
   const origin = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -101,7 +98,7 @@ export async function sendOrderNotification(orderId: string): Promise<NotifyResu
         .update(schema.orderNotifications)
         .set({ status: "sent", attempts, sentAt: sql`now()`, lastError: null })
         .where(eq(schema.orderNotifications.id, row.id));
-      log({ orderId, outcome: "sent", attempts });
+      log.info("order.notify", { orderId, outcome: "sent", attempts });
       return "sent";
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -110,7 +107,7 @@ export async function sendOrderNotification(orderId: string): Promise<NotifyResu
         .update(schema.orderNotifications)
         .set({ status, attempts, lastError: reason.slice(0, 500) })
         .where(eq(schema.orderNotifications.id, row.id));
-      console.error(JSON.stringify({ event: "order.notify", orderId, outcome: status, attempts, message: reason }));
+      log.error("order.notify", { orderId, outcome: status, attempts, message: reason });
       return status;
     }
   });

@@ -1,6 +1,7 @@
 import "server-only";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb, schema, type Database } from "@/lib/db";
+import { log } from "@/lib/log";
 import { isKitchenQueueConfigured, publishKitchenTicket } from "@/lib/sqs";
 import { getKitchenTicket } from "./orders";
 
@@ -10,10 +11,6 @@ export type DispatchResult = "sent" | "pending" | "failed" | "not_pending";
 
 // The retry timer runs every minute, so this is roughly an hour of retries before staff must reprint by hand.
 const MAX_ATTEMPTS = 60;
-
-function log(fields: Record<string, unknown>) {
-  console.info(JSON.stringify({ event: "kitchen.dispatch", ...fields }));
-}
 
 /**
  * Call inside the transaction that first moves an order to paid. Without a queue configured the row is
@@ -51,7 +48,7 @@ export async function sendKitchenTicket(orderId: string): Promise<DispatchResult
         .update(schema.kitchenDispatches)
         .set({ status: "sent", attempts, sqsMessageId: messageId, sentAt: sql`now()`, lastError: null })
         .where(eq(schema.kitchenDispatches.id, row.id));
-      log({ orderId, outcome: "sent", messageId, attempts });
+      log.info("kitchen.dispatch", { orderId, outcome: "sent", messageId, attempts });
       return "sent";
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -60,7 +57,7 @@ export async function sendKitchenTicket(orderId: string): Promise<DispatchResult
         .update(schema.kitchenDispatches)
         .set({ status, attempts, lastError: message.slice(0, 500) })
         .where(eq(schema.kitchenDispatches.id, row.id));
-      console.error(JSON.stringify({ event: "kitchen.dispatch", orderId, outcome: status, attempts, message }));
+      log.error("kitchen.dispatch", { orderId, outcome: status, attempts, message });
       return status;
     }
   });

@@ -1,15 +1,11 @@
-import { getPool } from "../lib/db";
 import { sendPendingKitchenTickets } from "../lib/kitchen/dispatch";
+import { log } from "../lib/log";
+import { runJob } from "./run-job";
 
 /** Run by deploy/systemd/power-meals-dispatch.timer to retry tickets the app could not send to SQS. */
-sendPendingKitchenTickets()
-  .then((results) => {
-    if (results.sent || results.pending || results.failed) {
-      console.info(JSON.stringify({ event: "kitchen.dispatch_retry", ...results }));
-    }
-  })
-  .catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  })
-  .finally(() => getPool().end());
+void runJob("kitchen.dispatch_retry", process.env.HEARTBEAT_DISPATCH_URL, async () => {
+  const results = await sendPendingKitchenTickets();
+  if (results.sent || results.pending || results.failed) log.info("kitchen.dispatch_retry", results);
+  // Rows that end up failed are reported by the watchdog; this check only says the timer ran.
+  return { ok: true, summary: results };
+});

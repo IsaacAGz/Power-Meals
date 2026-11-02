@@ -10,6 +10,8 @@ Group=powermeals
 WorkingDirectory=/srv/power-meals
 EnvironmentFile=/srv/power-meals/.env
 Environment=NODE_ENV=production
+# Lets rsyslog copy this unit's JSON lines to /var/log/power-meals/app.log for CloudWatch (deploy/rsyslog).
+SyslogIdentifier=power-meals-notify
 # Same command as `npm run orders:notify`; adjust the node path to match power-meals.service.
 ExecStart=/usr/bin/node node_modules/tsx/dist/cli.mjs --conditions=react-server scripts/notify-orders.ts
 TimeoutStartSec=120

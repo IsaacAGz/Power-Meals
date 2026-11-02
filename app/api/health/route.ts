@@ -1,4 +1,5 @@
 import { getPool } from "@/lib/db";
+import { errorMessage, log } from "@/lib/log";
 import { getRedis } from "@/lib/redis";
 
 type CheckResult = "ok" | "error";
@@ -16,7 +17,7 @@ async function runCheck(name: string, probe: () => Promise<unknown>): Promise<Ch
     ]);
     return "ok";
   } catch (error) {
-    console.error(`[health] ${name} check failed:`, error instanceof Error ? error.message : error);
+    log.error("health.check_failed", { check: name, message: errorMessage(error) });
     return "error";
   } finally {
     clearTimeout(timer);

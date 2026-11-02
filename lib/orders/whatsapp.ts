@@ -5,6 +5,7 @@ import { getCatalog } from "@/lib/catalog";
 import { parseCartItem, resolveLine, MAX_LINE_QUANTITY, type ResolvedLine } from "@/lib/catalog/pricing";
 import type { CartItem } from "@/lib/catalog/types";
 import { getDb, schema } from "@/lib/db";
+import { log } from "@/lib/log";
 import { getRedis } from "@/lib/redis";
 import { sessionTtlSeconds } from "@/lib/session";
 import { readCheckoutInput, validateCheckout, type CheckoutInput } from "./checkout-input";
@@ -92,7 +93,7 @@ export async function claimWhatsAppOrder(sessionId: string, userId: string) {
       notes: snapshot.input.notas || null,
       lines,
     });
-    console.info(JSON.stringify({ event: "whatsapp.order_claimed", orderId: order.id, userId }));
+    log.info("whatsapp.order_claimed", { orderId: order.id, userId });
     return true;
   } catch (error) {
     await redis.set(key, claimed, "EX", sessionTtlSeconds());

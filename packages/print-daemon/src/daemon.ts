@@ -21,12 +21,16 @@ const printerOptions = {
 const MAX_BACKOFF_SECONDS = 300;
 const RECEIVE_ERROR_PAUSE_MS = 5_000;
 const MEMORY_LIMIT = 1_000;
+const HEARTBEAT_INTERVAL_MS = 60_000;
 
 // SQS can deliver a message twice; remembering recent order ids keeps that from printing two tickets.
 const printedOrders = new Map<string, true>();
 // Print failures per message id, for the visibility backoff.
 const failures = new Map<string, number>();
 
+// False from a print failure until the next successful print; reported to the heartbeat as /fail.
+let printerOk = true;
+let lastHeartbeat = 0;
 let stopping = false;
 const shutdown = new AbortController();
 
@@ -80,12 +84,14 @@ async function handle(message: Message) {
     } else {
       await print(renderReceipt(ticket, config.printerColumns), printerOptions);
       remember(printedOrders, ticket.orderId, true);
+      printerOk = true;
       log({ event: "printed", orderId: ticket.orderId, orderNumber: ticket.orderNumber });
     }
     failures.delete(messageId);
   } catch (error) {
     const attempt = (failures.get(messageId) ?? 0) + 1;
     remember(failures, messageId, attempt);
+    printerOk = false;
     const backoff = Math.min(MAX_BACKOFF_SECONDS, config.retryVisibilitySeconds * 2 ** (attempt - 1));
     log({ event: "print_failed", orderId, attempt, retryInSeconds: backoff, error: errorMessage(error) });
     await setVisibility(message, backoff).catch((visibilityError) =>
@@ -96,6 +102,16 @@ async function handle(message: Message) {
 
   // If the delete fails the message comes back, and the printed-order memory skips the reprint.
   await remove(message).catch((error) => log({ event: "delete_failed", orderId, error: errorMessage(error) }));
+}
+
+/** Healthchecks.io: no ping means the daemon or its network is down; /fail means the printer is failing. */
+async function heartbeat() {
+  if (!config.heartbeatUrl || Date.now() - lastHeartbeat < HEARTBEAT_INTERVAL_MS) return;
+  lastHeartbeat = Date.now();
+  const url = printerOk ? config.heartbeatUrl : `${config.heartbeatUrl.replace(/\/+$/, "")}/fail`;
+  await fetch(url, { method: "POST", signal: AbortSignal.timeout(5_000) }).catch((error) =>
+    log({ event: "heartbeat_failed", error: errorMessage(error) }),
+  );
 }
 
 async function pause(ms: number) {
@@ -130,6 +146,7 @@ async function run() {
       continue;
     }
     for (const message of messages) await handle(message);
+    await heartbeat();
   }
   log({ event: "stopped" });
 }

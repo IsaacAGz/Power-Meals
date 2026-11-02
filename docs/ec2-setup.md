@@ -200,9 +200,124 @@ Returns `503` with `"degraded"` and the failing check when PostgreSQL or Redis i
 | `/images/*`, `/maplibre/*`, `/logo.svg` | CachingOptimized | Public assets |
 | `/api/*` | CachingDisabled | Forward all headers, cookies, query strings |
 | `/kitchen/*`, `/cuenta*`, `/historial*`, `/ingresar*`, `/registro*`, `/pedido*` | CachingDisabled | Session-bound pages; `/pedido*` also covers the Openpay return pages, which must forward the `order_ref` and `id` query strings |
+| `/monitoring*` | CachingDisabled | Sentry tunnel: browser errors are POSTed here, so allow all HTTP methods |
 | Default (`*`) | UseOriginCacheControlHeaders | Static marketing pages send `public` headers; dynamic ones send `private, no-store` |
 
 Forward the session cookie only on the uncached behaviors so cached responses never vary by user.
+
+## 10. Observability
+
+Each tool covers one question. All of them are free or cost a few dollars a month at this traffic.
+
+| Question | Tool | Alerts when |
+|---|---|---|
+| Is the site up? | UptimeRobot (free) | `https://powermeals.mx/` or `/menu` stops answering, or the TLS certificate is about to expire |
+| Did a timer or a kitchen printer stop? | Healthchecks.io (free) | A check misses its ping, or receives `/fail` |
+| Did an order, message or ticket get stuck? | Watchdog timer + Healthchecks.io | `npm run ops:watchdog` finds a problem (see below) |
+| Did code throw? | Sentry (free Developer plan) | A new error type, or a spike |
+| What happened around it? | CloudWatch Logs | `level` is `error` more than a few times, or any `alert.*` line |
+| Is the disk or memory full? | CloudWatch agent | Disk > 80 %, memory > 90 % |
+
+### Sentry
+
+1. Create a Next.js project in Sentry. Set `NEXT_PUBLIC_SENTRY_DSN` in `.env` (and `NEXT_PUBLIC_SENTRY_ENVIRONMENT=staging` on a staging box), then rebuild: the DSN is inlined into the browser bundle.
+2. Optional: set `SENTRY_ORG`, `SENTRY_PROJECT` and `SENTRY_AUTH_TOKEN` (an org token with source map upload) so `npm run build` uploads source maps and removes them from `.next`.
+3. Browser errors go to `/monitoring` on this site and the server forwards them, so the CSP is unchanged. Add the `/monitoring*` CloudFront behavior from section 9.
+
+[`lib/sentry-options.ts`](../lib/sentry-options.ts) turns off the SDK's default collection of headers, cookies, request bodies, query strings and stack-frame variables, and scrubs `order_ref` and `token` from URLs. Only the stack trace and the route are sent.
+
+### Healthchecks.io
+
+Create one check per row and put its ping URL in the matching `.env` (the kitchen ones in each PC's print-daemon `.env`):
+
+| Check | Variable | Period | Grace |
+|---|---|---|---|
+| Notify retry timer | `HEARTBEAT_NOTIFY_URL` | 1 min | 5 min |
+| Dispatch retry timer | `HEARTBEAT_DISPATCH_URL` | 1 min | 5 min |
+| Watchdog | `HEARTBEAT_WATCHDOG_URL` | 5 min | 10 min |
+| One per kitchen printer | `HEARTBEAT_URL` (print daemon) | 1 min | 5 min |
+
+Add an email (or the free Telegram integration) to the project. The watchdog check also goes red when PostgreSQL or Redis is unreachable, because the run fails.
+
+### Watchdog
+
+Runs every 5 minutes and logs one `alert.<check>` line per problem, with the order numbers:
+
+| Check | Meaning |
+|---|---|
+| `notify.failed`, `dispatch.failed` | A paid-order message or kitchen ticket gave up after 60 attempts (last 24 h) |
+| `notify.stuck`, `dispatch.stuck` | Still pending after `WATCHDOG_NOTIFY_STALE_MINUTES` (15) / `WATCHDOG_DISPATCH_STALE_MINUTES` (5) |
+| `orders.paid_not_started` | Paid for more than `WATCHDOG_PAID_STALE_MINUTES` (60) and not yet `preparing` |
+| `openpay.amount_mismatch` | A card charge did not match the order total (last 24 h) |
+| `redis.memory_high` | Redis is above 90 % of `maxmemory` and will start evicting sessions and carts |
+
+```bash
+sudo cp deploy/systemd/power-meals-watchdog.service deploy/systemd/power-meals-watchdog.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now power-meals-watchdog.timer
+sudo -u powermeals npm run ops:watchdog   # one run by hand
+```
+
+### CloudWatch Logs and host metrics
+
+The app writes one JSON line per event ([`lib/log.ts`](../lib/log.ts)) with phones, emails and addresses masked. The CloudWatch agent reads files, not journald, so rsyslog copies those lines to `/var/log/power-meals/app.log`; `journalctl` keeps working as before.
+
+1. Attach `CloudWatchAgentServerPolicy` to the EC2 instance role.
+2. rsyslog and log rotation (the units' `SyslogIdentifier` is what the rule matches, so copy the updated units first):
+
+   ```bash
+   sudo cp deploy/systemd/power-meals*.service /etc/systemd/system/ && sudo systemctl daemon-reload
+   sudo systemctl restart power-meals
+   sudo cp deploy/rsyslog/30-power-meals.conf /etc/rsyslog.d/
+   sudo cp deploy/rsyslog/power-meals.logrotate /etc/logrotate.d/power-meals
+   sudo systemctl restart rsyslog
+   tail -f /var/log/power-meals/app.log    # one JSON object per line
+   ```
+
+3. Install the agent and load [`deploy/cloudwatch/amazon-cloudwatch-agent.json`](../deploy/cloudwatch/amazon-cloudwatch-agent.json):
+
+   ```bash
+   sudo apt-get install -y ./amazon-cloudwatch-agent.deb   # from the AWS download page for your architecture
+   sudo usermod -aG adm cwagent                            # read /var/log/power-meals and nginx logs
+   sudo cp deploy/cloudwatch/amazon-cloudwatch-agent.json /opt/aws/amazon-cloudwatch-agent/etc/
+   sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s \
+     -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+   ```
+
+4. Metric filters, an SNS topic and the alarms:
+
+   ```bash
+   TOPIC=$(aws sns create-topic --name power-meals-alerts --query TopicArn --output text)
+   aws sns subscribe --topic-arn "$TOPIC" --protocol email --notification-endpoint <you@example.com>
+
+   aws logs put-metric-filter --log-group-name /power-meals/app --filter-name errors \
+     --filter-pattern '{ $.level = "error" }' \
+     --metric-transformations metricName=AppErrors,metricNamespace=PowerMeals,metricValue=1,defaultValue=0
+   aws logs put-metric-filter --log-group-name /power-meals/app --filter-name alerts \
+     --filter-pattern '{ $.event = "alert.*" }' \
+     --metric-transformations metricName=WatchdogAlerts,metricNamespace=PowerMeals,metricValue=1,defaultValue=0
+
+   alarm() { aws cloudwatch put-metric-alarm --alarm-actions "$TOPIC" --ok-actions "$TOPIC" \
+     --treat-missing-data notBreaching --evaluation-periods 1 "$@"; }
+   alarm --alarm-name power-meals-errors --namespace PowerMeals --metric-name AppErrors \
+     --statistic Sum --period 300 --threshold 5 --comparison-operator GreaterThanOrEqualToThreshold
+   alarm --alarm-name power-meals-watchdog --namespace PowerMeals --metric-name WatchdogAlerts \
+     --statistic Sum --period 300 --threshold 1 --comparison-operator GreaterThanOrEqualToThreshold
+   ```
+
+   Add the disk and memory alarms from the console (CloudWatch → Alarms → `PowerMeals` namespace → `disk_used_percent` for `/` above 80, `mem_used_percent` above 90), since their dimensions depend on the instance.
+
+Query recent errors in **Logs Insights** on `/power-meals/app`:
+
+```
+fields ts, event, orderId, message | filter level = "error" | sort ts desc | limit 50
+```
+
+`requestId` on a line matches `$request_id` from Nginx, so one request can be followed across lines.
+
+### UptimeRobot
+
+`/api/health` only answers localhost (section 8), so from outside monitor the pages: a keyword monitor on `https://powermeals.mx/` for `Power Meals`, an HTTP monitor on `https://powermeals.mx/menu`, and SSL expiry alerts. Database and Redis outages are caught by the watchdog check above.
 
 ## Cloudflare static deploy
 
