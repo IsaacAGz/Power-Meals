@@ -1,0 +1,22 @@
+[Unit]
+Description=Power Meals: refresh the CloudFront origin-facing ranges nginx trusts for the client IP
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Root: it writes /etc/nginx/snippets/cloudfront-real-ip.conf and reloads nginx. Plain Node, no app code or .env.
+User=root
+WorkingDirectory=/srv/power-meals/current
+# Lets rsyslog copy this unit's JSON lines to /var/log/power-meals/app.log for CloudWatch (deploy/rsyslog).
+SyslogIdentifier=power-meals-cloudfront-ips
+# Adjust the node path to match power-meals.service.
+ExecStart=/usr/bin/node scripts/cloudfront-real-ip.mjs /etc/nginx/snippets/cloudfront-real-ip.conf
+TimeoutStartSec=2min
+
+# nginx -t opens the log files and temp directories, so those stay writable.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/etc/nginx/snippets -/var/log/nginx -/var/lib/nginx -/run/nginx -/run/nginx.pid

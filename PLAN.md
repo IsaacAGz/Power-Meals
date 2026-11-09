@@ -25,7 +25,7 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 
 - [x] **Database backups.** Nightly `pg_dump` to S3 (30 days), a systemd timer that pings its own Healthchecks.io check, and a written restore procedure. EBS snapshots through Data Lifecycle Manager as a second layer. See [`docs/ec2-setup.md`](./docs/ec2-setup.md#11-backups)
 - [x] **Deploy script.** `scripts/deploy.sh`: check the required env vars, `npm ci`, migrate, build, restart, wait for `/api/health`, and keep the previous build to roll back to. Releases under `/srv/power-meals/releases`, see [`docs/ec2-setup.md`](./docs/ec2-setup.md#6-deploy)
-- [ ] **Nginx client IP behind CloudFront.** Fill in `set_real_ip_from` in [`deploy/nginx/powermeals.conf`](./deploy/nginx/powermeals.conf). Without it every rate limit, including 5 logins a minute, is shared by everyone behind the same CloudFront edge.
+- [x] **Nginx client IP behind CloudFront.** [`deploy/nginx/powermeals.conf`](./deploy/nginx/powermeals.conf) restores the viewer IP from CloudFront's origin-facing ranges, which `scripts/cloudfront-real-ip.mjs` writes and a daily timer refreshes. See [`docs/ec2-setup.md`](./docs/ec2-setup.md#7-nginx)
 - [ ] **Builder dropdowns before hydration.** A Base or Proteína picked before React hydrates `/pedido` is reset to empty (found by the Playwright test). Keep the dropdowns disabled until the page is interactive.
 - [ ] **Aviso de privacidad.** `/aviso-de-privacidad`, linked from the footer, `/registro` and checkout. The text comes from a lawyer or a reviewed template.
 - [ ] Merge `pedir-change` and `observability` into the main branch and push.
@@ -49,7 +49,7 @@ Follow [`docs/ec2-setup.md`](./docs/ec2-setup.md) in order:
 - [ ] Production `.env`, including `NEXT_PUBLIC_SITE_URL=https://powermealstj.com`, Sentry with `NEXT_PUBLIC_SENTRY_ENVIRONMENT=production`, and the `HEARTBEAT_*` URLs. Back up `PASSWORD_PEPPER` with the database credentials
 - [ ] Deploy (build after `.env` is final), seed, and one staff account per kitchen
 - [ ] Notify, dispatch, watchdog and backup timers; unpause their Healthchecks.io checks
-- [ ] Nginx and Let's Encrypt (`certbot renew --dry-run`)
+- [ ] CloudFront IP list and its timer, then Nginx and Let's Encrypt (`certbot renew --dry-run`)
 - [ ] CloudFront behaviors, including `/monitoring*` with all HTTP methods for Sentry
 - [ ] CloudWatch: rsyslog, agent, SNS topic (confirm the subscription email), metric filters and alarms
 - [ ] Run one backup and restore it into a scratch database

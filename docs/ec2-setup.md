@@ -224,7 +224,19 @@ psql "$DATABASE_URL" -c "select o.order_number, n.channel, n.status, n.attempts,
 
 ## 7. Nginx
 
-Merge [`deploy/nginx/powermeals.conf`](../deploy/nginx/powermeals.conf) into the existing config. Uncomment the `set_real_ip_from` block with CloudFront's origin-facing ranges; without it every rate limit applies per CloudFront edge rather than per client.
+Behind CloudFront, nginx sees an edge IP, so every rate limit (including 5 logins a minute) would be shared by everyone on the same edge. The server block restores the viewer IP from `X-Forwarded-For`, trusting only CloudFront's origin-facing ranges. Those ranges come from AWS's `ip-ranges.json` and change over time, so [`scripts/cloudfront-real-ip.mjs`](../scripts/cloudfront-real-ip.mjs) writes them to `/etc/nginx/snippets/cloudfront-real-ip.conf` and a daily timer keeps them current. It replaces the file only when the ranges change, checks it with `nginx -t` (restoring the old list if that fails) and reloads nginx. A failed run logs `cloudfront_ips.failed`, a `level = "error"` line the CloudWatch alarm picks up; nginx keeps the last good list meanwhile.
+
+Create the list before merging the server block, since the block includes it:
+
+```bash
+cd /srv/power-meals/current
+sudo node scripts/cloudfront-real-ip.mjs     # writes /etc/nginx/snippets/cloudfront-real-ip.conf
+sudo cp deploy/systemd/power-meals-cloudfront-ips.service deploy/systemd/power-meals-cloudfront-ips.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now power-meals-cloudfront-ips.timer
+```
+
+Then merge [`deploy/nginx/powermeals.conf`](../deploy/nginx/powermeals.conf) into the existing config, run `sudo nginx -t` and `sudo systemctl reload nginx`. To check it, sign in once through the site and look at the access log: the client address should be your own IP, not a CloudFront one (`130.176.*`, `64.252.*` and similar).
 
 Security headers (CSP, HSTS, frame denial) are sent by Next.js from [`next.config.ts`](../next.config.ts), so Nginx does not need to add them.
 

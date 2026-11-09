@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh the CloudFront ranges for nginx every day
+
+[Timer]
+OnCalendar=*-*-* 04:15:00 America/Tijuana
+# Run at boot if the instance was off at 04:15.
+Persistent=true
+RandomizedDelaySec=15min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
