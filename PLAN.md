@@ -36,7 +36,7 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 - [ ] Healthchecks.io: `notify-timer`, `dispatch-timer`, `watchdog`, the backup check, and one `printer-<kitchen>` per kitchen. Pause them until the server pings
 - [ ] UptimeRobot account (monitors are added at launch)
 - [ ] SES: verified from-address and **production access** (out of the sandbox), or confirmation and paid-order emails only reach verified addresses
-- [ ] Cloudflare Turnstile production keys for `powermeals.mx`
+- [ ] Cloudflare Turnstile production keys for `powermealstj.com`
 - [ ] EC2 instance role: `CloudWatchAgentServerPolicy`, `ses:SendEmail`, the backup bucket policy
 - [ ] Backup S3 bucket with versioning and the 30-day lifecycle rule; DLM policy for daily EBS snapshots
 - [ ] Aviso de privacidad text
@@ -46,7 +46,7 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 Follow [`docs/ec2-setup.md`](./docs/ec2-setup.md) in order:
 
 - [ ] Sections 1–5: app user, PostgreSQL, Redis with persistence on, security groups (SSH through Session Manager or the admin IP), `unattended-upgrades`
-- [ ] Production `.env`, including `NEXT_PUBLIC_SITE_URL=https://powermeals.mx`, Sentry with `NEXT_PUBLIC_SENTRY_ENVIRONMENT=production`, and the `HEARTBEAT_*` URLs. Back up `PASSWORD_PEPPER` with the database credentials
+- [ ] Production `.env`, including `NEXT_PUBLIC_SITE_URL=https://powermealstj.com`, Sentry with `NEXT_PUBLIC_SENTRY_ENVIRONMENT=production`, and the `HEARTBEAT_*` URLs. Back up `PASSWORD_PEPPER` with the database credentials
 - [ ] Deploy (build after `.env` is final), seed, and one staff account per kitchen
 - [ ] Notify, dispatch, watchdog and backup timers; unpause their Healthchecks.io checks
 - [ ] Nginx and Let's Encrypt (`certbot renew --dry-run`)
@@ -66,8 +66,8 @@ On a temporary hostname pointed at EC2, before moving DNS:
 
 ## Production cutover
 
-- [ ] Point `powermeals.mx` at CloudFront/EC2
-- [ ] UptimeRobot: keyword monitor on `https://powermeals.mx/` (`Power Meals`), HTTP monitor on `/menu`, SSL expiry alerts
+- [ ] Point `powermealstj.com` at CloudFront/EC2
+- [ ] UptimeRobot: keyword monitor on `https://powermealstj.com/` (`Power Meals`), HTTP monitor on `/menu`, SSL expiry alerts
 - [ ] Watch Sentry and Healthchecks.io for the first hour; keep the Cloudflare static deploy as a fallback
 - [ ] After a few stable days, retire the Cloudflare static deploy and move [`wrangler.jsonc`](./wrangler.jsonc) guidance to `docs/legacy-static-deploy.md`
 
@@ -85,7 +85,7 @@ Do not start until sandbox credentials exist. No new payment design.
 - Run one real sandbox payment: pending order, redirect, webhook marks `paid` once, replay is `duplicate`, guest cart clears, `/pedido/success` shows the receipt. That first success also queues the kitchen ticket and the paid-order message.
 - Home, `/menu`, the footer, and `/pedido` already follow `isOpenpayConfigured()` and switch to the card-payment copy when both keys are set.
 
-Production keys only after the sandbox payment has worked: `OPENPAY_SANDBOX_MODE=false` and webhook `https://powermeals.mx/api/webhooks/openpay`.
+Production keys only after the sandbox payment has worked: `OPENPAY_SANDBOX_MODE=false` and webhook `https://powermealstj.com/api/webhooks/openpay`.
 
 ### WhatsApp template
 

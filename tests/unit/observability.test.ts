@@ -88,8 +88,8 @@ describe("sentry options", () => {
   });
 
   it("scrubs receipt refs and email tokens from URLs", () => {
-    expect(scrubUrl("https://powermeals.mx/pedido/success?order_ref=abc123&id=tr1")).toBe(
-      "https://powermeals.mx/pedido/success?order_ref=[redacted]&id=tr1",
+    expect(scrubUrl("https://powermealstj.com/pedido/success?order_ref=abc123&id=tr1")).toBe(
+      "https://powermealstj.com/pedido/success?order_ref=[redacted]&id=tr1",
     );
     expect(scrubUrl("/verificar?token=secret")).toBe("/verificar?token=[redacted]");
   });
@@ -100,8 +100,8 @@ describe("sentry options", () => {
       from: "/pedido",
       to: "/pedido/success?order_ref=[redacted]",
     });
-    expect(options.beforeSend({ request: { url: "https://powermeals.mx/recuperar/nueva?token=t" } }).request?.url).toBe(
-      "https://powermeals.mx/recuperar/nueva?token=[redacted]",
+    expect(options.beforeSend({ request: { url: "https://powermealstj.com/recuperar/nueva?token=t" } }).request?.url).toBe(
+      "https://powermealstj.com/recuperar/nueva?token=[redacted]",
     );
   });
 });

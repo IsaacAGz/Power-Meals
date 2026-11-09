@@ -168,7 +168,7 @@ Staff can't self-register. Create each account for one kitchen (`zona-rio`, `ota
 cd /srv/power-meals/current
 read -rs STAFF_PASSWORD && export STAFF_PASSWORD   # typed without echo, kept out of shell history
 sudo -u powermeals --preserve-env=STAFF_PASSWORD npm run user:create-staff -- \
-  --email cocina.otay@powermeals.mx --name "Cocina Otay" --facility otay
+  --email cocina.otay@powermealstj.com --name "Cocina Otay" --facility otay
 unset STAFF_PASSWORD
 ```
 
@@ -176,8 +176,8 @@ Staff log in at `/ingresar` and land on `/kitchen/dashboard`, which only shows t
 
 ### Openpay
 
-1. Set `OPENPAY_MERCHANT_ID`, `OPENPAY_PRIVATE_KEY`, `OPENPAY_SANDBOX_MODE`, `OPENPAY_WEBHOOK_USER` and `OPENPAY_WEBHOOK_PASSWORD` in `.env`, and make sure `NEXT_PUBLIC_SITE_URL=https://powermeals.mx` before building. Without the merchant ID and key, `/pedido` hides the card button and offers WhatsApp only.
-2. In the Openpay dashboard, add a webhook for `https://powermeals.mx/api/webhooks/openpay` with the same user and password (basic auth). Openpay sends a verification request first; paste the logged `verificationCode` back into the dashboard:
+1. Set `OPENPAY_MERCHANT_ID`, `OPENPAY_PRIVATE_KEY`, `OPENPAY_SANDBOX_MODE`, `OPENPAY_WEBHOOK_USER` and `OPENPAY_WEBHOOK_PASSWORD` in `.env`, and make sure `NEXT_PUBLIC_SITE_URL=https://powermealstj.com` before building. Without the merchant ID and key, `/pedido` hides the card button and offers WhatsApp only.
+2. In the Openpay dashboard, add a webhook for `https://powermealstj.com/api/webhooks/openpay` with the same user and password (basic auth). Openpay sends a verification request first; paste the logged `verificationCode` back into the dashboard:
 
    ```bash
    journalctl -u power-meals | grep '"type":"verification"'
@@ -256,7 +256,7 @@ Each tool covers one question. All of them are free or cost a few dollars a mont
 
 | Question | Tool | Alerts when |
 |---|---|---|
-| Is the site up? | UptimeRobot (free) | `https://powermeals.mx/` or `/menu` stops answering, or the TLS certificate is about to expire |
+| Is the site up? | UptimeRobot (free) | `https://powermealstj.com/` or `/menu` stops answering, or the TLS certificate is about to expire |
 | Did a timer or a kitchen printer stop? | Healthchecks.io (free) | A check misses its ping, or receives `/fail` |
 | Did an order, message or ticket get stuck? | Watchdog timer + Healthchecks.io | `npm run ops:watchdog` finds a problem (see below) |
 | Did code throw? | Sentry (free Developer plan) | A new error type, or a spike |
@@ -363,7 +363,7 @@ fields ts, event, orderId, message | filter level = "error" | sort ts desc | lim
 
 ### UptimeRobot
 
-`/api/health` only answers localhost (section 8), so from outside monitor the pages: a keyword monitor on `https://powermeals.mx/` for `Power Meals`, an HTTP monitor on `https://powermeals.mx/menu`, and SSL expiry alerts. Database and Redis outages are caught by the watchdog check above.
+`/api/health` only answers localhost (section 8), so from outside monitor the pages: a keyword monitor on `https://powermealstj.com/` for `Power Meals`, an HTTP monitor on `https://powermealstj.com/menu`, and SSL expiry alerts. Database and Redis outages are caught by the watchdog check above.
 
 ## 11. Backups
 

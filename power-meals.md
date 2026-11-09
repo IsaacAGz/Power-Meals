@@ -87,7 +87,7 @@ Say this plainly if the portfolio mentions content or launch. Do not present sta
 - Card payment (Openpay) is implemented and off until merchant credentials exist. The site copy says transfer, not card.
 - Delivery is shown and cannot be selected.
 - Paid-order email needs `ORDER_EMAIL_FROM`. Paid-order WhatsApp needs an approved Spanish utility template and three Cloud API env vars. The kitchen printer needs `SQS_QUEUE_URL`. Each of those stays skipped until it is set.
-- The app runs locally on Node, PostgreSQL, and Redis. Production cutover to EC2 and `powermeals.mx` is not done. The old Cloudflare static deploy is still in the repo and is not the current app.
+- The app runs locally on Node, PostgreSQL, and Redis. Production cutover to EC2 and `powermealstj.com` is not done. The old Cloudflare static deploy is still in the repo and is not the current app.
 
 ## Tech stack
 
@@ -193,4 +193,4 @@ Reduced motion is checked in the reveal component, the menu filter, the suggeste
 - That the site messages customers on WhatsApp today, or that a real kitchen printer has taken a ticket from AWS
 - That delivery is available
 - That the food photography, partner names, or case studies are final business assets
-- A production deploy on EC2 or `powermeals.mx`
+- A production deploy on EC2 or `powermealstj.com`

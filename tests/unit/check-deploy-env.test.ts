@@ -5,10 +5,10 @@ const VALID = {
   DATABASE_URL: "postgres://powermeals:pw@127.0.0.1:5432/powermeals",
   REDIS_URL: "redis://:pw@127.0.0.1:6379/0",
   PASSWORD_PEPPER: "x".repeat(44),
-  NEXT_PUBLIC_SITE_URL: "https://powermeals.mx",
+  NEXT_PUBLIC_SITE_URL: "https://powermealstj.com",
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: "site",
   TURNSTILE_SECRET_KEY: "secret",
-  ORDER_EMAIL_FROM: "pedidos@powermeals.mx",
+  ORDER_EMAIL_FROM: "pedidos@powermealstj.com",
   AWS_REGION: "us-west-2",
   NEXT_PUBLIC_SENTRY_DSN: "https://key@o1.ingest.sentry.io/1",
   NEXT_PUBLIC_MAPTILER_KEY: "maptiler",
@@ -43,7 +43,7 @@ describe("checkDeployEnv", () => {
       "NEXT_PUBLIC_SITE_URL must be https (it is inlined into the build)",
       "NEXT_PUBLIC_SITE_URL points at localhost",
     ]);
-    expect(checkDeployEnv({ ...VALID, NEXT_PUBLIC_SITE_URL: "powermeals.mx" }).errors).toEqual([
+    expect(checkDeployEnv({ ...VALID, NEXT_PUBLIC_SITE_URL: "powermealstj.com" }).errors).toEqual([
       "NEXT_PUBLIC_SITE_URL is not a URL",
     ]);
   });

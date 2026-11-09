@@ -92,13 +92,13 @@ describe("request helpers", () => {
   const request = (headers: Record<string, string>) => new Request("http://localhost:3000/api/x", { method: "POST", headers });
 
   it("accepts the same host or the site URL as origin", () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://powermeals.mx");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://powermealstj.com");
     expect(isSameOrigin(request({ origin: "http://localhost:3000", host: "localhost:3000" }))).toBe(true);
-    expect(isSameOrigin(request({ origin: "https://powermeals.mx", host: "127.0.0.1:3000" }))).toBe(true);
+    expect(isSameOrigin(request({ origin: "https://powermealstj.com", host: "127.0.0.1:3000" }))).toBe(true);
   });
 
   it("rejects a missing, foreign, or malformed origin", () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://powermeals.mx");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://powermealstj.com");
     expect(isSameOrigin(request({ host: "localhost:3000" }))).toBe(false);
     expect(isSameOrigin(request({ origin: "https://evil.com", host: "localhost:3000" }))).toBe(false);
     expect(isSameOrigin(request({ origin: "not a url", host: "localhost:3000" }))).toBe(false);

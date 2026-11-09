@@ -14,10 +14,10 @@ const CHECK_ENV = join(__dirname, "../../scripts/check-deploy-env.mjs");
 const VALID_ENV = `DATABASE_URL=postgres://powermeals:pw@127.0.0.1:5432/powermeals
 REDIS_URL=redis://:pw@127.0.0.1:6379/0
 PASSWORD_PEPPER=${"x".repeat(44)}
-NEXT_PUBLIC_SITE_URL=https://powermeals.mx
+NEXT_PUBLIC_SITE_URL=https://powermealstj.com
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=site
 TURNSTILE_SECRET_KEY=secret
-ORDER_EMAIL_FROM=pedidos@powermeals.mx
+ORDER_EMAIL_FROM=pedidos@powermealstj.com
 AWS_REGION=us-west-2
 `;
 
