@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import { ConditionalFooter } from "@/components/ConditionalFooter";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { publicSiteUrl } from "@/lib/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,6 +28,9 @@ const cabinet = localFont({
 });
 
 export const metadata: Metadata = {
+  // Makes the Open Graph image (app/opengraph-image.jpg) and canonical URLs absolute on the production domain.
+  metadataBase: publicSiteUrl(),
+  alternates: { canonical: "./" },
   title: {
     default: "Power Meals | Comida real. Energía real. Resultados reales.",
     template: "%s | Power Meals",
