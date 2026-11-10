@@ -13,5 +13,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.1152.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3"
   }
 }
