@@ -26,7 +26,7 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 - [x] **Database backups.** Nightly `pg_dump` to S3 (30 days), a systemd timer that pings its own Healthchecks.io check, and a written restore procedure. EBS snapshots through Data Lifecycle Manager as a second layer. See [`docs/ec2-setup.md`](./docs/ec2-setup.md#11-backups)
 - [x] **Deploy script.** `scripts/deploy.sh`: check the required env vars, `npm ci`, migrate, build, restart, wait for `/api/health`, and keep the previous build to roll back to. Releases under `/srv/power-meals/releases`, see [`docs/ec2-setup.md`](./docs/ec2-setup.md#6-deploy)
 - [x] **Nginx client IP behind CloudFront.** [`deploy/nginx/powermeals.conf`](./deploy/nginx/powermeals.conf) restores the viewer IP from CloudFront's origin-facing ranges, which `scripts/cloudfront-real-ip.mjs` writes and a daily timer refreshes. See [`docs/ec2-setup.md`](./docs/ec2-setup.md#7-nginx)
-- [ ] **Builder dropdowns before hydration.** A Base or Proteína picked before React hydrates `/pedido` is reset to empty (found by the Playwright test). Keep the dropdowns disabled until the page is interactive.
+- [x] **Fields before hydration.** A pick or keystroke on `/pedido` before React hydrated was reset (dropdowns, radios and text alike). The order UI now sits in a fieldset that stays disabled until hydration (`components/useHydrated.ts`), with a Playwright test that holds the JavaScript
 - [ ] **Aviso de privacidad.** `/aviso-de-privacidad`, linked from the footer, `/registro` and checkout. The text comes from a lawyer or a reviewed template.
 - [ ] Merge `pedir-change` and `observability` into the main branch and push.
 

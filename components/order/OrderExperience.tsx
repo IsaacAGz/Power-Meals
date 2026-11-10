@@ -10,6 +10,7 @@ import { CartSummary } from "./CartSummary";
 import { CheckoutForm, type PointOption, type ZoneOption } from "./CheckoutForm";
 import { MealBuilder } from "./MealBuilder";
 import { PackageBuilder } from "./PackageBuilder";
+import { useHydrated } from "../useHydrated";
 
 export type RecentOrder = { id: string; orderNumber: number; totalCents: number; summary: string };
 
@@ -73,109 +74,115 @@ export function OrderExperience({
     { id: "paquete", label: "Paquetes" },
   ];
 
+  // Every field here is controlled, and a pick or keystroke made before hydration is reset once React takes over
+  // (a select back to empty, typed text cleared). A disabled fieldset disables all of them natively until then.
+  const hydrated = useHydrated();
+
   return (
-    <div className="flex min-w-0 flex-col gap-14">
-      {recentOrders.length > 0 && (
-        <section aria-labelledby="pedir-de-nuevo">
-          <h2 id="pedir-de-nuevo" className="font-display text-2xl font-extrabold tracking-tight">
-            Pide de nuevo
-          </h2>
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-            {recentOrders.map((order) => (
-              <li key={order.id}>
-                <button
-                  type="button"
-                  onClick={() => repeat(order)}
-                  disabled={busyKey === order.id}
-                  className="flex w-full items-start gap-3 rounded-frame border border-line-strong bg-paper p-4 text-left transition-colors hover:border-ink disabled:opacity-60"
-                >
-                  <ArrowCounterClockwise weight="bold" className="mt-0.5 size-4 shrink-0" aria-hidden />
-                  <span className="min-w-0">
-                    <span className="block text-[15px] font-semibold">
-                      Pedido #{order.orderNumber} · {formatCents(order.totalCents)}
+    <fieldset disabled={!hydrated} aria-busy={!hydrated} className="min-w-0">
+      <div className="flex min-w-0 flex-col gap-14">
+        {recentOrders.length > 0 && (
+          <section aria-labelledby="pedir-de-nuevo">
+            <h2 id="pedir-de-nuevo" className="font-display text-2xl font-extrabold tracking-tight">
+              Pide de nuevo
+            </h2>
+            <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+              {recentOrders.map((order) => (
+                <li key={order.id}>
+                  <button
+                    type="button"
+                    onClick={() => repeat(order)}
+                    disabled={busyKey === order.id}
+                    className="flex w-full items-start gap-3 rounded-frame border border-line-strong bg-paper p-4 text-left transition-colors hover:border-ink disabled:opacity-60"
+                  >
+                    <ArrowCounterClockwise weight="bold" className="mt-0.5 size-4 shrink-0" aria-hidden />
+                    <span className="min-w-0">
+                      <span className="block text-[15px] font-semibold">
+                        Pedido #{order.orderNumber} · {formatCents(order.totalCents)}
+                      </span>
+                      <span className="mt-1 line-clamp-2 block text-[13px] text-muted">{order.summary}</span>
                     </span>
-                    <span className="mt-1 line-clamp-2 block text-[13px] text-muted">{order.summary}</span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section aria-label="Elige tus platillos">
-        <div role="tablist" aria-label="Tipo de pedido" className="flex flex-wrap gap-2">
-          {tabs.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              role="tab"
-              id={`tab-${option.id}`}
-              aria-selected={tab === option.id}
-              aria-controls={`panel-${option.id}`}
-              onClick={() => setTab(option.id)}
-              className={`h-10 rounded-control border px-4 text-[15px] font-semibold transition-colors ${
-                tab === option.id ? "border-ink bg-ink text-cream" : "border-line-strong text-ink hover:border-ink"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="mt-8">
-          {tab === "platillo" ? (
-            <MealBuilder
-              catalog={catalog}
-              initialTemplate={initial.template}
-              lines={cart.lines.filter((line) => line.item.kind === "meal")}
-              busyKey={busyKey}
-              onAdd={add}
-              onSetQuantity={changeQuantity}
-            />
-          ) : (
-            <PackageBuilder catalog={catalog} initialPackage={initial.package} onAdd={add} />
-          )}
-        </div>
-      </section>
-
-      <section aria-labelledby="tu-pedido">
-        <h2 id="tu-pedido" className="mb-5 font-display text-2xl font-extrabold tracking-tight">
-          Tu pedido
-        </h2>
-        {notice && (
-          <p
-            role={notice.tone === "error" ? "alert" : "status"}
-            className={`mb-4 flex items-center gap-2 text-sm font-medium ${notice.tone === "error" ? "text-[#B42318]" : "text-ink"}`}
-          >
-            {notice.tone === "error" ? (
-              <WarningCircle weight="bold" className="size-4 shrink-0" aria-hidden />
-            ) : (
-              <CheckCircle weight="bold" className="size-4 shrink-0" aria-hidden />
-            )}
-            {notice.text}
-          </p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
-        <CartSummary cart={cart} busyKey={busyKey} onSetQuantity={changeQuantity} />
-      </section>
 
-      <CheckoutForm
-        cart={cart}
-        zones={zones}
-        points={points}
-        prefill={prefill}
-        initialZone={initial.zone}
-        initialPoint={initial.point}
-        openpayEnabled={openpayEnabled}
-        signedIn={signedIn}
-        onWhatsApp={({ saved }) => {
-          if (saved) {
-            setCart(emptyCartView());
-            setNotice({ tone: "ok", text: "Guardamos el pedido en tu cuenta como pedido por WhatsApp." });
-          } else {
-            setNotice({ tone: "ok", text: "Inicia sesión para guardar este pedido en tu cuenta." });
-          }
-        }}
-      />
-    </div>
+        <section aria-label="Elige tus platillos">
+          <div role="tablist" aria-label="Tipo de pedido" className="flex flex-wrap gap-2">
+            {tabs.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                role="tab"
+                id={`tab-${option.id}`}
+                aria-selected={tab === option.id}
+                aria-controls={`panel-${option.id}`}
+                onClick={() => setTab(option.id)}
+                className={`h-10 rounded-control border px-4 text-[15px] font-semibold transition-colors ${
+                  tab === option.id ? "border-ink bg-ink text-cream" : "border-line-strong text-ink hover:border-ink"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="mt-8">
+            {tab === "platillo" ? (
+              <MealBuilder
+                catalog={catalog}
+                initialTemplate={initial.template}
+                lines={cart.lines.filter((line) => line.item.kind === "meal")}
+                busyKey={busyKey}
+                onAdd={add}
+                onSetQuantity={changeQuantity}
+              />
+            ) : (
+              <PackageBuilder catalog={catalog} initialPackage={initial.package} onAdd={add} />
+            )}
+          </div>
+        </section>
+
+        <section aria-labelledby="tu-pedido">
+          <h2 id="tu-pedido" className="mb-5 font-display text-2xl font-extrabold tracking-tight">
+            Tu pedido
+          </h2>
+          {notice && (
+            <p
+              role={notice.tone === "error" ? "alert" : "status"}
+              className={`mb-4 flex items-center gap-2 text-sm font-medium ${notice.tone === "error" ? "text-[#B42318]" : "text-ink"}`}
+            >
+              {notice.tone === "error" ? (
+                <WarningCircle weight="bold" className="size-4 shrink-0" aria-hidden />
+              ) : (
+                <CheckCircle weight="bold" className="size-4 shrink-0" aria-hidden />
+              )}
+              {notice.text}
+            </p>
+          )}
+          <CartSummary cart={cart} busyKey={busyKey} onSetQuantity={changeQuantity} />
+        </section>
+
+        <CheckoutForm
+          cart={cart}
+          zones={zones}
+          points={points}
+          prefill={prefill}
+          initialZone={initial.zone}
+          initialPoint={initial.point}
+          openpayEnabled={openpayEnabled}
+          signedIn={signedIn}
+          onWhatsApp={({ saved }) => {
+            if (saved) {
+              setCart(emptyCartView());
+              setNotice({ tone: "ok", text: "Guardamos el pedido en tu cuenta como pedido por WhatsApp." });
+            } else {
+              setNotice({ tone: "ok", text: "Inicia sesión para guardar este pedido en tu cuenta." });
+            }
+          }}
+        />
+      </div>
+    </fieldset>
   );
 }

@@ -28,6 +28,30 @@ test("a guest builds plates and sends a written order to WhatsApp without creati
   expect(await countOrders()).toBe(ordersBefore);
 });
 
+test("the order fields stay disabled until the page hydrates, so an early pick is not lost", async ({ page }) => {
+  // Hold the JavaScript so the server-rendered page sits there un-hydrated, as on a slow phone.
+  let release!: () => void;
+  const scriptsHeld = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/_next/static/**/*.js", async (route) => {
+    await scriptsHeld;
+    await route.continue();
+  });
+  await page.goto("/pedido", { waitUntil: "domcontentloaded" });
+  await expect(page.getByLabel("Base")).toBeDisabled();
+  await expect(page.getByLabel("Nombre")).toBeDisabled();
+  await expect(page.getByLabel("Punto de recolección")).toBeDisabled();
+
+  release();
+  await page.getByLabel("Base").selectOption({ label: "Arroz" });
+  await page.getByLabel("Nombre").fill(CUSTOMER.name);
+  // Another field's change re-renders the builder and the form; the earlier values have to survive it.
+  await page.getByLabel("Proteína").selectOption({ label: "Pollo" });
+  await page.getByLabel("Punto de recolección").selectOption({ label: "Otay" });
+  await expect(page.getByLabel("Base")).toHaveValue("arroz");
+  await expect(page.getByLabel("Nombre")).toHaveValue(CUSTOMER.name);
+  await expect(page.getByRole("button", { name: "Confirmar · $139" })).toBeEnabled();
+});
+
 test("a suggested plate fills the open row without adding it", async ({ page }) => {
   await page.goto("/pedido");
   await page.getByRole("button", { name: /Pollo \+ camote \+ veggies/ }).click();
