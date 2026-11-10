@@ -27,7 +27,8 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 - [x] **Deploy script.** `scripts/deploy.sh`: check the required env vars, `npm ci`, migrate, build, restart, wait for `/api/health`, and keep the previous build to roll back to. Releases under `/srv/power-meals/releases`, see [`docs/ec2-setup.md`](./docs/ec2-setup.md#6-deploy)
 - [x] **Nginx client IP behind CloudFront.** [`deploy/nginx/powermeals.conf`](./deploy/nginx/powermeals.conf) restores the viewer IP from CloudFront's origin-facing ranges, which `scripts/cloudfront-real-ip.mjs` writes and a daily timer refreshes. See [`docs/ec2-setup.md`](./docs/ec2-setup.md#7-nginx)
 - [x] **Fields before hydration.** A pick or keystroke on `/pedido` before React hydrated was reset (dropdowns, radios and text alike). The order UI now sits in a fieldset that stays disabled until hydration (`components/useHydrated.ts`), with a Playwright test that holds the JavaScript
-- [ ] **Aviso de privacidad.** `/aviso-de-privacidad`, linked from the footer, `/registro` and checkout. The text comes from a lawyer or a reviewed template.
+- [x] **Aviso de privacidad page.** `/aviso-de-privacidad`, linked from the footer, both registration forms and checkout. The draft text describes what the app does (data, providers, retention, the `pm_session` cookie, allergies in order notes as sensitive data) under the 2025 LFPDPPP
+- [ ] **Aviso de privacidad before launch.** Replace the bracketed legal name and address in `PRIVACY` ([`lib/constants.ts`](./lib/constants.ts)), create the `privacidad@powermealstj.com` mailbox, and have a lawyer review the text
 - [ ] Merge `pedir-change` and `observability` into the main branch and push.
 
 ### Accounts and AWS console
@@ -39,7 +40,7 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 - [ ] Cloudflare Turnstile production keys for `powermealstj.com`
 - [ ] EC2 instance role: `CloudWatchAgentServerPolicy`, `ses:SendEmail`, the backup bucket policy
 - [ ] Backup S3 bucket with versioning and the 30-day lifecycle rule; DLM policy for daily EBS snapshots
-- [ ] Aviso de privacidad text
+- [ ] Aviso de privacidad: legal name, address, privacy mailbox, legal review
 
 ### Server
 

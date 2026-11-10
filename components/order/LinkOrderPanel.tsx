@@ -149,6 +149,13 @@ export function LinkOrderPanel({
             <p className="text-sm font-medium text-[#B42318]">No podemos crear la cuenta en este momento. Intenta más tarde.</p>
           )}
           {alert}
+          <p className="text-[13px] text-muted">
+            Al crear tu cuenta aceptas nuestro{" "}
+            <Link href="/aviso-de-privacidad" target="_blank" className={textLink}>
+              Aviso de privacidad
+            </Link>
+            .
+          </p>
           <button type="submit" disabled={pending || !siteKey || !turnstileToken} className={`${buttonPrimary} w-full sm:w-fit`}>
             {pending && <CircleNotch weight="bold" className="size-5 motion-safe:animate-spin" aria-hidden />}
             Crear cuenta

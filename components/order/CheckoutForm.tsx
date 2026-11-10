@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { CaretDown, CircleNotch, CreditCard, WarningCircle, WhatsappLogo } from "@phosphor-icons/react";
 import type { CartView } from "@/lib/cart/view";
@@ -352,6 +353,13 @@ export function CheckoutForm({
             </button>
           )}
         </div>
+        <p className="text-[13px] text-muted">
+          Usamos tus datos solo para preparar y entregar tu pedido, como explica nuestro{" "}
+          <Link href="/aviso-de-privacidad" target="_blank" className={textLink}>
+            Aviso de privacidad
+          </Link>
+          . Si escribes alergias o datos de salud en las notas, nos autorizas a usarlos solo para preparar tu pedido.
+        </p>
         {message && (
           <p role="alert" className="flex items-start gap-2 text-sm font-medium text-[#B42318]">
             <WarningCircle weight="bold" className="mt-0.5 size-4 shrink-0" aria-hidden />

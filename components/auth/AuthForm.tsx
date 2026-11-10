@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { CircleNotch, WarningCircle } from "@phosphor-icons/react";
 import type { AuthResponse } from "@/lib/auth/responses";
 import { PASSWORD_MIN_LENGTH, type FieldErrors } from "@/lib/auth/validation";
-import { buttonPrimary, inputClass } from "@/lib/ui";
+import { buttonPrimary, inputClass, textLink } from "@/lib/ui";
 import { FormField } from "../FormField";
 import { TurnstileField, turnstileSiteKey } from "./TurnstileField";
 
@@ -184,6 +185,16 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
         <button type="button" disabled={pending} onClick={resend} className="text-sm font-semibold text-ink underline">
           Enviar de nuevo
         </button>
+      )}
+
+      {mode === "register" && (
+        <p className="text-[13px] text-muted">
+          Al crear tu cuenta aceptas nuestro{" "}
+          <Link href="/aviso-de-privacidad" target="_blank" className={textLink}>
+            Aviso de privacidad
+          </Link>
+          .
+        </p>
       )}
 
       <button

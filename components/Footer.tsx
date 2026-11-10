@@ -47,7 +47,10 @@ export function Footer() {
           © {year} Power Meals. Precios en MXN.{" "}
           {isOpenpayConfigured()
             ? "Pago con tarjeta en Openpay o por transferencia vía WhatsApp."
-            : "Pago por transferencia vía WhatsApp."}
+            : "Pago por transferencia vía WhatsApp."}{" "}
+          <Link href="/aviso-de-privacidad" className="underline underline-offset-4 transition-colors hover:text-ink">
+            Aviso de privacidad
+          </Link>
         </p>
       </div>
     </footer>
