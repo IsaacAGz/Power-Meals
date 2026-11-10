@@ -29,7 +29,7 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 - [x] **Fields before hydration.** A pick or keystroke on `/pedido` before React hydrated was reset (dropdowns, radios and text alike). The order UI now sits in a fieldset that stays disabled until hydration (`components/useHydrated.ts`), with a Playwright test that holds the JavaScript
 - [x] **Aviso de privacidad page.** `/aviso-de-privacidad`, linked from the footer, both registration forms and checkout. The draft text describes what the app does (data, providers, retention, the `pm_session` cookie, allergies in order notes as sensitive data) under the 2025 LFPDPPP
 - [ ] **Aviso de privacidad before launch.** Replace the bracketed legal name and address in `PRIVACY` ([`lib/constants.ts`](./lib/constants.ts)), create the `privacidad@powermealstj.com` mailbox, and have a lawyer review the text
-- [x] **CI.** [`.github/workflows/ci.yml`](./.github/workflows/ci.yml): lint, typecheck, unit and component tests and a production build on every push, plus the print daemon typecheck. Integration and Playwright tests stay local
+- [x] **CI.** [`.github/workflows/ci.yml`](./.github/workflows/ci.yml): lint, typecheck, unit and component tests and a production build on every push; integration and Playwright tests against PostgreSQL 18 and Redis 8 containers; the print daemon typecheck
 - [x] Merge `pedir-change` and `observability` into the main branch and push.
 
 ### Accounts and AWS console
