@@ -218,6 +218,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now power-meals-notify.timer
 ```
 
+To check SES before relying on it, send the paid-order email (fake order #0) to one address. It prints whether the account is still in the sandbox, whether the from-address and domain are verified, and the DKIM status. In the sandbox the recipient must be verified too.
+
+```bash
+npm run email:test -- you@example.com                                   # locally, with an AWS profile
+cd /srv/power-meals/current && sudo -u powermeals npm run email:test -- you@example.com   # on EC2 (the release links shared/.env)
+```
+
 ```bash
 psql "$DATABASE_URL" -c "select o.order_number, n.channel, n.status, n.attempts, n.last_error from order_notifications n join orders o on o.id = n.order_id where n.status <> 'sent' order by n.created_at desc limit 20"
 ```

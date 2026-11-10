@@ -24,7 +24,8 @@
     "orders:notify": "tsx --conditions=react-server --env-file-if-exists=.env scripts/notify-orders.ts",
     "ops:watchdog": "tsx --conditions=react-server --env-file-if-exists=.env scripts/watchdog.ts",
     "db:backup": "tsx --conditions=react-server --env-file-if-exists=.env scripts/backup-database.ts",
-    "whatsapp:test": "tsx --conditions=react-server --env-file-if-exists=.env scripts/test-whatsapp.ts"
+    "whatsapp:test": "tsx --conditions=react-server --env-file-if-exists=.env scripts/test-whatsapp.ts",
+    "email:test": "tsx --conditions=react-server --env-file-if-exists=.env scripts/test-email.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",

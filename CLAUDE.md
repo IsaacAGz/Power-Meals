@@ -25,6 +25,7 @@ STAFF_PASSWORD=... npm run user:create-staff -- --email <email> --name <name> --
 
 npm run kitchen:dispatch    # retry the kitchen_dispatches outbox (SQS)
 npm run orders:notify       # retry the order_notifications outbox (email / WhatsApp)
+npm run email:test -- <to>  # SES status (sandbox, identity, DKIM) and one sample paid-order email
 npm run ops:watchdog        # report failed/stuck outbox rows and stale paid orders (alert.* logs + heartbeat)
 npm run db:backup           # pg_dump streamed to s3://$BACKUP_S3_BUCKET (needs pg_dump on PATH and AWS credentials)
 ```
