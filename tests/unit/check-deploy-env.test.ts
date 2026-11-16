@@ -11,7 +11,6 @@ const VALID = {
   ORDER_EMAIL_FROM: "pedidos@powermealstj.com",
   AWS_REGION: "us-west-2",
   NEXT_PUBLIC_SENTRY_DSN: "https://key@o1.ingest.sentry.io/1",
-  NEXT_PUBLIC_MAPTILER_KEY: "maptiler",
   HEARTBEAT_NOTIFY_URL: "https://hc-ping.com/a",
   HEARTBEAT_DISPATCH_URL: "https://hc-ping.com/b",
   HEARTBEAT_WATCHDOG_URL: "https://hc-ping.com/c",

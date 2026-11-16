@@ -13,9 +13,8 @@ export const MAP_COLORS = {
   ink: "#111111",
 } as const;
 
-export function mapTilerStyleUrl(key: string) {
-  return `https://api.maptiler.com/maps/dataviz-light/style.json?key=${key}`;
-}
+/** OpenFreeMap Positron: free, no key. Tiles, fonts and sprites all come from tiles.openfreemap.org (see the CSP). */
+export const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 
 const HIDDEN = /poi|transit|rail|railway|station|airport|aeroway|ferry|bus|subway|housenumber|mountain_peak/;
 const WATER = /water|ocean|sea|river|lake|bay|marine/;

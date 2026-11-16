@@ -121,7 +121,7 @@ export default function AvisoDePrivacidadPage() {
                 ni el contenido de los formularios.
               </li>
               <li>
-                <strong>MapTiler:</strong> el mapa de ubicaciones, que recibe tu dirección IP para mostrarlo.
+                <strong>OpenFreeMap:</strong> el mapa de ubicaciones, que recibe tu dirección IP para mostrarlo.
               </li>
               <li>
                 <strong>WhatsApp (Meta):</strong> cuando eliges enviar tu pedido por WhatsApp, y para avisarte del pago

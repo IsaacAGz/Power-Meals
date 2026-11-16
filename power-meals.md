@@ -96,7 +96,7 @@ Say this plainly if the portfolio mentions content or launch. Do not present sta
 - **Drizzle ORM** and **PostgreSQL** for the catalog, users, orders, payments, and status events
 - **Redis** for sessions, guest carts, WhatsApp order snapshots, and one-time email tokens
 - **Motion** (`motion/react`) for hero and scroll reveals, menu transitions, and the suggested-plate expand
-- **MapLibre GL JS** with a **MapTiler** `dataviz-light` style, recolored to the brand
+- **MapLibre GL JS** with the **OpenFreeMap** `positron` style (free, no key), recolored to the brand
 - **Phosphor Icons**, bold weight. Server components import `@phosphor-icons/react/dist/ssr`
 - **Argon2id** (`@node-rs/argon2`) and a `PASSWORD_PEPPER`
 - **Cloudflare Turnstile** on registration and password-reset requests
@@ -106,7 +106,7 @@ Say this plainly if the portfolio mentions content or launch. Do not present sta
 - **Fonts:** Cabinet Grotesk (local, display), Geist (body), Geist Mono (prices)
 - Money is formatted with `Intl.NumberFormat` for `es-MX` from integer cents. Timezone is `America/Tijuana`.
 
-`next/image` is used with `images.unoptimized: true`. Security headers, including the content security policy, are set from `next.config.ts`. The policy allows MapTiler and the Turnstile script and frame. `worker-src 'self' blob:` lets the MapLibre worker start.
+`next/image` is used with `images.unoptimized: true`. Security headers, including the content security policy, are set from `next.config.ts`. The policy allows OpenFreeMap tiles and the Turnstile script and frame. `worker-src 'self' blob:` lets the MapLibre worker start.
 
 ## Visual system
 
@@ -140,7 +140,7 @@ The home teaser does not load MapLibre until the section is within 300px of the 
 
 Markers are custom HTML: a 12px-radius black square with a yellow lightning icon. Selecting a kitchen highlights its marker and moves the camera. Reduced motion uses `jumpTo` instead of `flyTo`.
 
-On `style.load`, `lib/map-style.ts` walks every MapTiler layer and repaints it: cream land, warm water and parks, white roads with hairline casings, ink labels with a cream halo. POI, transit, and building extrusions are hidden. If the MapTiler key is missing or WebGL fails, the same coordinates are drawn by an SVG fallback. The slot keeps its height so the page does not jump.
+On `style.load`, `lib/map-style.ts` walks every base-style layer and repaints it: cream land, warm water and parks, white roads with hairline casings, ink labels with a cream halo. POI, transit, and building extrusions are hidden. If the tiles cannot load or WebGL fails, the same coordinates are drawn by an SVG fallback. The slot keeps its height so the page does not jump.
 
 MapLibre's worker is copied into `public/maplibre` on install, dev, and build, and the map calls `setWorkerUrl` before `new Map()`. The worker files are gitignored because they come from `node_modules`.
 
@@ -166,7 +166,7 @@ Staff move a WhatsApp order to paid. That step sets `paid_at`, marks the payment
 
 ### A map inside a bundler is its own project
 
-MapLibre loads a web worker relative to its own module URL. Once Next bundles the library, that URL is wrong and the map dies quietly. The fix is a small Node script that copies the worker and the shared chunk it imports, plus `setWorkerUrl` before `new Map()`. Around that: dynamic import with `ssr: false`, a lazy home teaser, cooperative gestures on phones, `jumpTo` for reduced motion, React roots inside marker elements unmounted so React 19 does not warn during cleanup, a layer-walking recolor, a CSP that allows MapTiler and a same-origin worker, and an SVG fallback with the same coordinates.
+MapLibre loads a web worker relative to its own module URL. Once Next bundles the library, that URL is wrong and the map dies quietly. The fix is a small Node script that copies the worker and the shared chunk it imports, plus `setWorkerUrl` before `new Map()`. Around that: dynamic import with `ssr: false`, a lazy home teaser, cooperative gestures on phones, `jumpTo` for reduced motion, React roots inside marker elements unmounted so React 19 does not warn during cleanup, a layer-walking recolor, a CSP that allows OpenFreeMap and a same-origin worker, and an SVG fallback with the same coordinates.
 
 ### Accessibility is part of the motion and the forms
 

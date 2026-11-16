@@ -6,7 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { useReducedMotion } from "motion/react";
 import { Lightning } from "@phosphor-icons/react";
 import type { Map as MapLibreMap } from "maplibre-gl";
-import { applyBrandStyle, mapTilerStyleUrl } from "@/lib/map-style";
+import { applyBrandStyle, MAP_STYLE_URL } from "@/lib/map-style";
 import { getMapPin, MAP_CENTER, MAP_ZOOM, mapPins, pointsBounds } from "@/lib/locations-data";
 import { buildWhatsAppUrl, PICKUP_QUESTION_MESSAGE } from "@/lib/whatsapp";
 import { ZonesSketch } from "./ZonesSketch";
@@ -39,15 +39,14 @@ export default function BrandMap({
   const selectedRef = useRef<string | null>(null);
   const paddingRef = useRef(padding);
   const reduce = useReducedMotion();
-  const apiKey = process.env.NEXT_PUBLIC_MAPTILER_KEY;
-  const [status, setStatus] = useState<Status>(apiKey ? "loading" : "error");
+  const [status, setStatus] = useState<Status>("loading");
 
   useEffect(() => {
     onPointClickRef.current = onPointClick;
   }, [onPointClick]);
 
   useEffect(() => {
-    if (!apiKey || !containerRef.current) return;
+    if (!containerRef.current) return;
 
     let cancelled = false;
     let map: MapLibreMap | null = null;
@@ -63,7 +62,7 @@ export default function BrandMap({
       try {
         map = new maplibregl.Map({
           container: containerRef.current,
-          style: mapTilerStyleUrl(apiKey),
+          style: MAP_STYLE_URL,
           center: MAP_CENTER,
           zoom: MAP_ZOOM,
           interactive,
@@ -154,7 +153,7 @@ export default function BrandMap({
       map?.remove();
       mapRef.current = null;
     };
-  }, [apiKey, interactive, showPickupPoints]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [interactive, showPickupPoints]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const map = mapRef.current;

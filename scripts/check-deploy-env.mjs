@@ -25,7 +25,6 @@ const GROUPS = [
 /** Monitoring and backups: the site works without them, but nobody hears about a problem. */
 const RECOMMENDED = [
   "NEXT_PUBLIC_SENTRY_DSN",
-  "NEXT_PUBLIC_MAPTILER_KEY",
   "HEARTBEAT_NOTIFY_URL",
   "HEARTBEAT_DISPATCH_URL",
   "HEARTBEAT_WATCHDOG_URL",

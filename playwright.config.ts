@@ -42,7 +42,6 @@ export default defineConfig({
       WHATSAPP_TEMPLATE_NAME: "",
       OPENPAY_MERCHANT_ID: "",
       OPENPAY_PRIVATE_KEY: "",
-      NEXT_PUBLIC_MAPTILER_KEY: "",
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: "",
       TURNSTILE_SECRET_KEY: "",
     },

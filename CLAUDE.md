@@ -46,7 +46,7 @@ npx playwright test e2e/ordering.spec.ts --project desktop
 ```
 
 - Integration and e2e tests use the `powermeals_test` database and Redis DB 15, derived from `.env` by `tests/setup/test-env.ts` (override with `TEST_DATABASE_URL` / `TEST_REDIS_URL`). It refuses non-`_test` databases and Redis DB 0 because tests truncate tables and flush Redis. Create the database once: `sudo -u postgres createdb -O powermeals powermeals_test`. Migrations and seed run automatically in global setup.
-- Every external service (SES, SQS, WhatsApp, Openpay, Turnstile, MapTiler) is off in tests unless a test turns it on.
+- Every external service (SES, SQS, WhatsApp, Openpay, Turnstile) is off in tests unless a test turns it on.
 - Playwright starts its own `next dev` on port 3100 with `NEXT_DIST_DIR=.next-e2e`, seeding one customer and one Otay staff user (`e2e/support.ts`).
 - `server-only` is stubbed for Vitest (`tests/stubs/server-only.ts`); test data helpers are in `tests/helpers/`.
 

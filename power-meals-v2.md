@@ -8,7 +8,7 @@
 * **Database:** PostgreSQL hosted locally on the EC2 instance (bound strictly to 127.0.0.1, EBS volume encrypted at rest).  
 * **Session & Caching Layer:** Redis hosted locally on the EC2 instance (bound to 127.0.0.1, password-protected, with maxmemory eviction limits).  
 * **Asynchronous Messaging / Kitchen Dispatch:** AWS SQS (Simple Queue Service).  
-* **Maps:** MapLibre GL JS with a MapTiler style (retaining the existing brand styling and fallback logic).
+* **Maps:** MapLibre GL JS with the OpenFreeMap Positron style (retaining the existing brand styling and fallback logic).
 
 ## Security & Hardening Requirements
 

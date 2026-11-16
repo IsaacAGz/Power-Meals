@@ -12,7 +12,7 @@ Orders are placed through WhatsApp and paid by bank transfer, which is how the k
 - PostgreSQL with Drizzle ORM; Redis for sessions, guest carts and rate limits
 - Argon2id passwords with a server-side pepper; Cloudflare Turnstile on registration and password reset
 - Amazon SES (email), Amazon SQS and a small print daemon (kitchen tickets), Openpay (cards, off)
-- MapLibre GL with a MapTiler style
+- MapLibre GL with the OpenFreeMap Positron style, recolored to the brand
 - Vitest and Playwright; Sentry, Healthchecks.io and CloudWatch in production
 
 ## Run it locally
