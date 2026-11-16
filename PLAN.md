@@ -35,11 +35,11 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 ### Accounts and AWS console
 
 - [x] Sentry project and DSN
-- [ ] Healthchecks.io: `notify-timer`, `dispatch-timer`, `watchdog`, the backup check, and one `printer-<kitchen>` per kitchen. Pause them until the server pings
+- [x] Healthchecks.io: `notify-timer`, `dispatch-timer`, `watchdog`, `backup`, and the printer checks `printer-zona-rio`, `printer-otay`, `printer-monarca` and `printer-punto` (Rio Tijuana 3ra Etapa). They stay in the "new" state, which does not alert, until the server or the kitchen PC first pings them
 - [ ] UptimeRobot account (monitors are added at launch)
-- [ ] SES: verified from-address and **production access** (out of the sandbox), or confirmation and paid-order emails only reach verified addresses
-- [ ] Cloudflare Turnstile production keys for `powermealstj.com`
-- [ ] EC2 instance role: `CloudWatchAgentServerPolicy`, `ses:SendEmail`, the backup bucket policy
+- [x] SES: `powermealstj.com` verified, sending from `pedidos@powermealstj.com` in `us-west-2`, production access. Confirmed 2026-11-16 by `npm run email:test` to an unverified inbox
+- [x] Cloudflare Turnstile widget for `powermealstj.com` (subdomains included) and `localhost`; keys go into the server `.env`
+- [ ] EC2 instance role: `CloudWatchAgentServerPolicy`, the backup bucket policy, and `ses:SendEmail` on `identity/powermealstj.com`, `identity/pedidos@powermealstj.com` **and** `configuration-set/my-first-configuration-set` (the domain's default set; SES checks it too), with the condition `ses:FromAddress = pedidos@powermealstj.com`. The local `powermeals-ses-local` user has the same statement
 - [ ] Backup S3 bucket with versioning and the 30-day lifecycle rule; DLM policy for daily EBS snapshots
 - [ ] Aviso de privacidad: legal name, address, privacy mailbox, legal review
 
