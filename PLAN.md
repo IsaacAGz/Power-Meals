@@ -47,11 +47,12 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 
 Follow [`docs/ec2-setup.md`](./docs/ec2-setup.md) in order:
 
-- [ ] Sections 1–5: app user, PostgreSQL, Redis with persistence on, security groups (SSH through Session Manager or the admin IP), `unattended-upgrades`
+- [ ] Section 0: launch the instance (encrypted volume, instance role, Elastic IP, `origin.powermealstj.com`), install Node 22, PostgreSQL 18, Redis and Nginx, the origin certificate through the DNS challenge, and the ACM certificate in `us-east-1`
+- [ ] Sections 1–5: app user, PostgreSQL, Redis with persistence on, security groups (SSH through Session Manager or the admin IP)
 - [ ] Production `.env`, including `NEXT_PUBLIC_SITE_URL=https://powermealstj.com`, Sentry with `NEXT_PUBLIC_SENTRY_ENVIRONMENT=production`, and the `HEARTBEAT_*` URLs. Back up `PASSWORD_PEPPER` with the database credentials
 - [ ] Deploy (build after `.env` is final), seed, and one staff account per kitchen
 - [ ] Notify, dispatch, watchdog and backup timers; unpause their Healthchecks.io checks
-- [ ] CloudFront IP list and its timer, then Nginx and Let's Encrypt (`certbot renew --dry-run`)
+- [ ] CloudFront IP list and its timer, then Nginx
 - [ ] CloudFront behaviors, including `/monitoring*` with all HTTP methods for Sentry
 - [ ] CloudWatch: rsyslog, agent, SNS topic (confirm the subscription email), metric filters and alarms
 - [ ] Run one backup and restore it into a scratch database

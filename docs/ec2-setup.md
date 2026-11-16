@@ -1,6 +1,6 @@
-# EC2 server setup (Phase 0)
+# EC2 server setup
 
-How the Node.js app, PostgreSQL, and Redis run on the existing EC2 instance. Commands assume Ubuntu with systemd; adjust package names for Amazon Linux.
+How the Node.js app, PostgreSQL, and Redis run on one EC2 instance behind CloudFront. Section 0 creates the instance; sections 1–11 set it up, in order. Commands assume Ubuntu 24.04 with systemd.
 
 ```mermaid
 flowchart LR
@@ -10,6 +10,131 @@ flowchart LR
   Next --> PG["PostgreSQL 127.0.0.1:5432"]
   Next --> Redis["Redis 127.0.0.1:6379"]
 ```
+
+## 0. Create the instance
+
+Do this once, before section 1. It creates the instance, its fixed address and DNS name, installs the software the later sections expect, and gets the two TLS certificates: one on the server for Nginx, one in ACM for CloudFront.
+
+### Decisions first
+
+- **Region.** `us-west-2` (Oregon), the default in `.env.example`. SES, SQS, S3 and the instance all use this one `AWS_REGION`.
+- **DNS.** The commands below assume `powermealstj.com` is a Cloudflare DNS zone (the old static site is deployed there). For Route 53, see the note under [Origin certificate](#origin-certificate-nginx).
+- **Hostnames.**
+
+  | Name | Points at | Used for |
+  |---|---|---|
+  | `origin.powermealstj.com` | The Elastic IP (A record; in Cloudflare, **DNS only**, not proxied) | CloudFront's origin. Browsers never use it. |
+  | `staging.powermealstj.com` | The CloudFront distribution (CNAME) | The smoke test before the cutover. Turnstile allows it as a subdomain of `powermealstj.com`. |
+  | `powermealstj.com`, `www` | The old static site until the [cutover](../PLAN.md#production-cutover), then CloudFront | The live site |
+
+### Launch the instance
+
+EC2 console → **Launch instance**:
+
+| Setting | Value | Why |
+|---|---|---|
+| Name | `power-meals` | |
+| AMI | Ubuntu Server 24.04 LTS (64-bit) | The commands in this guide are for Ubuntu. |
+| Type | `t4g.medium` (ARM, 4 GB) or `t3.medium` (x86, 4 GB) | Postgres, Redis and Node share the box, and every deploy runs `next build` on it. With 2 GB (`.small`), add the swap file below. |
+| Key pair | None (use Session Manager), or one kept offline | No SSH port is opened in section 5. |
+| Network | Default VPC, a public subnet, auto-assign public IP off (the Elastic IP replaces it) | |
+| Security group | New, `power-meals`, rules from [section 5](#5-security-groups) | |
+| Storage | 30 GiB gp3, **Encrypted: yes** (default `aws/ebs` key) | The PostgreSQL data lives here. Encryption cannot be turned on later. |
+| IAM instance profile | New role `power-meals-ec2` with `AmazonSSMManagedInstanceCore` and `CloudWatchAgentServerPolicy` | Shell access without SSH, and the CloudWatch agent (section 10). SES, SQS and the backup bucket are added to this role later (sections 6 and 11). |
+| Advanced → Termination protection | Enable | |
+| Advanced → Metadata version | V2 only (token required) | The default for new instances; keep it. |
+
+Then:
+
+1. **Elastic IP.** EC2 → Elastic IPs → Allocate → Associate with the instance. Without it the public address changes on every stop and start.
+2. **Origin DNS record.** In Cloudflare DNS add `A origin <Elastic IP>`, proxy status **DNS only**.
+3. **Connect.** EC2 → the instance → Connect → Session Manager, or from your machine `aws ssm start-session --target <instance-id>`. Shells open as `ssm-user`, who has sudo.
+
+### Base packages
+
+```bash
+sudo apt-get update && sudo apt-get -y upgrade
+sudo apt-get install -y git curl ca-certificates unattended-upgrades
+sudo dpkg-reconfigure -plow unattended-upgrades    # answer Yes: security updates install automatically
+sudo timedatectl set-timezone UTC                  # logs and backup keys are UTC; the app formats in America/Tijuana itself
+```
+
+**Swap** (only on an instance with 2 GB of memory):
+
+```bash
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+**Node.js 22** from NodeSource. Ubuntu's own `nodejs` package is too old, and the systemd units run `/usr/bin/node`, so do not use nvm here.
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
+sudo bash /tmp/nodesource_setup.sh
+sudo apt-get install -y nodejs
+which node && node --version    # /usr/bin/node, v22.9 or newer
+```
+
+**PostgreSQL 18** from the PostgreSQL project's repository, the version CI tests against. Its `pg_dump` is the one the nightly backup uses. Configure it in [section 3](#3-postgresql-localhost-only); the files are under `/etc/postgresql/18/main/`.
+
+```bash
+sudo apt-get install -y postgresql-common
+sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+sudo apt-get install -y postgresql-18
+```
+
+**Redis** from Ubuntu (7.x; the app needs 6.2 or newer). Configure it in [section 4](#4-redis-localhost-only-password-bounded-memory).
+
+```bash
+sudo apt-get install -y redis-server
+```
+
+**Nginx and the AWS CLI.** Nginx is configured in [section 7](#7-nginx); the CLI is used for the backup restore and the CloudWatch commands.
+
+```bash
+sudo apt-get install -y nginx
+sudo rm /etc/nginx/sites-enabled/default    # nothing should answer for unknown hostnames
+sudo snap install aws-cli --classic
+```
+
+### Origin certificate (Nginx)
+
+CloudFront connects to the instance over HTTPS, so Nginx needs a certificate for every name CloudFront may send as the `Host`: `origin.powermealstj.com`, plus `powermealstj.com` and `www` for the behaviors that forward the viewer's `Host` (section 9).
+
+The certificate uses Let's Encrypt's **DNS challenge**. The usual HTTP challenge cannot work here: `powermealstj.com` points at the old site until the cutover, and port 80 only accepts CloudFront (section 5). The DNS challenge needs neither, and renewals run on their own.
+
+1. In Cloudflare: My Profile → API Tokens → Create token → template **Edit zone DNS**, zone resources: `powermealstj.com` only.
+2. On the server:
+
+   ```bash
+   sudo snap install --classic certbot
+   sudo ln -s /snap/bin/certbot /usr/bin/certbot
+   sudo snap set certbot trust-plugin-with-root=ok
+   sudo snap install certbot-dns-cloudflare
+
+   sudo install -m 600 /dev/null /etc/letsencrypt/cloudflare.ini
+   sudo nano /etc/letsencrypt/cloudflare.ini    # one line: dns_cloudflare_api_token = <token>
+
+   sudo certbot certonly --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini \
+     --cert-name powermealstj.com -d powermealstj.com -d www.powermealstj.com -d origin.powermealstj.com \
+     --deploy-hook "systemctl reload nginx"
+   sudo certbot renew --dry-run
+   ```
+
+The files land in `/etc/letsencrypt/live/powermealstj.com/`, the paths [`deploy/nginx/powermeals.conf`](../deploy/nginx/powermeals.conf) uses. The snap's timer renews them and reloads Nginx.
+
+On Route 53 instead: `sudo snap install certbot-dns-route53`, give the instance role `route53:ListHostedZones`, `route53:GetChange` and `route53:ChangeResourceRecordSets` on the zone, and use `--dns-route53` with no credentials file.
+
+### CloudFront certificate (ACM)
+
+CloudFront only takes certificates from ACM in **`us-east-1`**, whatever region the instance is in. Request it now; it is attached to the distribution in [section 9](#9-cloudfront-behaviors).
+
+1. ACM console, region **N. Virginia (us-east-1)** → Request → public certificate.
+2. Names: `powermealstj.com`, `www.powermealstj.com`, `staging.powermealstj.com`. Validation: DNS.
+3. Add the CNAME records ACM shows to Cloudflare (**DNS only**). The certificate is issued within minutes and renews itself while those records stay.
+
+Continue with section 1.
 
 ## 1. App user and layout
 
@@ -107,7 +232,7 @@ Inbound rules on the instance:
 | Port | Source | Purpose |
 |------|--------|---------|
 | 443 | CloudFront origin-facing prefix list (`com.amazonaws.global.cloudfront.origin-facing`) | HTTPS from CloudFront |
-| 80 | Same prefix list | Redirect / ACME challenge |
+| 80 | Same prefix list | Redirect to HTTPS. Certificates use the DNS challenge (section 0), so Let's Encrypt never needs this port. |
 | 22 | Admin IP only (or SSM Session Manager, no rule) | SSH |
 
 No rules for 5432, 6379, or 3000. Both data stores also bind to localhost, so a misconfigured security group alone does not expose them.
@@ -243,7 +368,15 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now power-meals-cloudfront-ips.timer
 ```
 
-Then merge [`deploy/nginx/powermeals.conf`](../deploy/nginx/powermeals.conf) into the existing config, run `sudo nginx -t` and `sudo systemctl reload nginx`. To check it, sign in once through the site and look at the access log: the client address should be your own IP, not a CloudFront one (`130.176.*`, `64.252.*` and similar).
+Then install [`deploy/nginx/powermeals.conf`](../deploy/nginx/powermeals.conf). It needs the certificate from [section 0](#origin-certificate-nginx). On an Nginx that already serves other sites, merge it instead, since the rate-limit zones may exist under other names.
+
+```bash
+sudo cp deploy/nginx/powermeals.conf /etc/nginx/sites-available/powermeals.conf
+sudo ln -s /etc/nginx/sites-available/powermeals.conf /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+ To check it, sign in once through the site and look at the access log: the client address should be your own IP, not a CloudFront one (`130.176.*`, `64.252.*` and similar).
 
 Security headers (CSP, HSTS, frame denial) are sent by Next.js from [`next.config.ts`](../next.config.ts), so Nginx does not need to add them.
 
@@ -257,6 +390,15 @@ curl -s http://127.0.0.1:3000/api/health
 Returns `503` with `"degraded"` and the failing check when PostgreSQL or Redis is unreachable. Nginx only allows it from localhost by default.
 
 ## 9. CloudFront behaviors
+
+Create the distribution with:
+
+- **Origin:** `origin.powermealstj.com`, protocol **HTTPS only**, minimum origin SSL protocol TLSv1.2.
+- **Alternate domain names:** `staging.powermealstj.com` for the smoke test. Add `powermealstj.com` and `www.powermealstj.com` at the cutover.
+- **Custom SSL certificate:** the ACM certificate from [section 0](#cloudfront-certificate-acm).
+- **Viewer protocol policy:** Redirect HTTP to HTTPS.
+
+On every uncached behavior below, use the **AllViewer** origin request policy, so the app sees the viewer's `Host`. The Origin checks on route handlers and Server Actions compare against it, and the kitchen board's status changes fail without it. Then add a CNAME `staging` → the distribution's `*.cloudfront.net` name (DNS only).
 
 | Path pattern | Cache policy | Notes |
 |--------------|--------------|-------|
@@ -533,4 +675,4 @@ Check `/kitchen/dashboard` and one receipt. Drop `powermeals_broken_*` once you 
 
 ## Cloudflare static deploy
 
-`main` still builds the static export for Cloudflare Workers. The `v2` branch removes `output: "export"` and cannot produce `out/`, so do not run `wrangler deploy` from it. Cloudflare is retired in the production cutover once EC2 is stable (see [PLAN.md](../PLAN.md#production-cutover)).
+The site live on Cloudflare Workers today is an older static export. `main` is now the Node app and no longer has `output: "export"`, so it cannot produce `out/`: do not run `wrangler deploy` from it. The static deploy stays up as the fallback until the production cutover, then it is retired (see [PLAN.md](../PLAN.md#production-cutover)).
