@@ -10,6 +10,7 @@ import { getDb, schema } from "@/lib/db";
 import { readCheckoutInput } from "@/lib/orders/checkout-input";
 import { rememberWhatsAppOrder } from "@/lib/orders/whatsapp";
 import { getRedis } from "@/lib/redis";
+import { getSession } from "@/lib/session";
 import { meal } from "../fixtures/catalog";
 import { cookieJar, sessionCookie } from "../helpers/cookies";
 import { addToCart, createUser, guest, json, PASSWORD, pickupBody, post } from "../helpers/factory";
@@ -210,6 +211,50 @@ describe("password reset", () => {
     expect((await resetPassword(post("/api/auth/reset-password", { token, password: "otra-contraseña-2" }))).status).toBe(400);
     expect((await login(post("/api/auth/login", { email: "cliente@example.com", password: PASSWORD }))).status).toBe(401);
     expect((await login(post("/api/auth/login", { email: "cliente@example.com", password: "nueva-contraseña-1" }))).status).toBe(200);
+  });
+
+  it("signs out every other session of that user, and only that user", async () => {
+    const user = await createUser({ email: "cliente@example.com" });
+    const other = await createUser({ email: "otra@example.com" });
+
+    // Two devices signed in with the old password, plus another user's session.
+    await login(post("/api/auth/login", { email: "cliente@example.com", password: PASSWORD }));
+    const phone = sessionCookie()!;
+    cookieJar.clear();
+    await login(post("/api/auth/login", { email: "cliente@example.com", password: PASSWORD }));
+    const laptop = sessionCookie()!;
+    cookieJar.clear();
+    await login(post("/api/auth/login", { email: "otra@example.com", password: PASSWORD }));
+    const otherSession = sessionCookie()!;
+    cookieJar.clear();
+
+    await forgotPassword(post("/api/auth/forgot-password", { email: "cliente@example.com", turnstileToken: "pass" }));
+    const token = tokenFrom(lastLinkTo("cliente@example.com"));
+    // The link is opened on the laptop, which is still signed in.
+    cookieJar.set("pm_session", laptop);
+    expect((await resetPassword(post("/api/auth/reset-password", { token, password: "nueva-contraseña-1" }))).status).toBe(200);
+
+    const current = sessionCookie()!;
+    expect(current).not.toBe(laptop);
+    expect(await sessionUserId()).toBe(user.id);
+    const redis = getRedis();
+    expect(await redis.exists(`session:${phone}`, `session:${laptop}`)).toBe(0);
+    expect(await redis.smembers(`user:sessions:${user.id}`)).toEqual([current]);
+    expect(JSON.parse((await redis.get(`session:${otherSession}`))!).userId).toBe(other.id);
+  });
+
+  it("also revokes a session created before the per-user index, once it has been used", async () => {
+    const user = await createUser({ email: "cliente@example.com" });
+    await login(post("/api/auth/login", { email: "cliente@example.com", password: PASSWORD }));
+    const legacy = sessionCookie()!;
+    await getRedis().del(`user:sessions:${user.id}`);
+    await getSession(); // the next request on that device enrolls it
+    cookieJar.clear();
+
+    await forgotPassword(post("/api/auth/forgot-password", { email: "cliente@example.com", turnstileToken: "pass" }));
+    const token = tokenFrom(lastLinkTo("cliente@example.com"));
+    await resetPassword(post("/api/auth/reset-password", { token, password: "nueva-contraseña-1" }));
+    expect(await getRedis().exists(`session:${legacy}`)).toBe(0);
   });
 
   it("checks the new password's length before using the token", async () => {

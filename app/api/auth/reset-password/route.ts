@@ -6,7 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { claimWhatsAppOrder } from "@/lib/orders/whatsapp";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { clientIp, isSameOrigin, readJsonBody } from "@/lib/request";
-import { getSession, rotateSession } from "@/lib/session";
+import { getSession, revokeUserSessions, rotateSession } from "@/lib/session";
 import { eq } from "drizzle-orm";
 
 const INVALID = "Este enlace no es válido o ya venció.";
@@ -39,6 +39,8 @@ export async function POST(request: Request) {
 
   const guestSessionId = (await getSession())?.id;
   const session = await rotateSession({ userId });
+  // Whoever was signed in with the old password (another device, an attacker) is signed out; only this browser stays.
+  await revokeUserSessions(userId, session.id);
   await migrateGuestCartToUser(session.id, userId);
   if (guestSessionId) await claimWhatsAppOrder(guestSessionId, userId);
   const redirectTo = user.role === "kitchen_staff" ? "/kitchen/dashboard" : "/cuenta";

@@ -28,6 +28,13 @@ export function sessionTtlSeconds(): number {
 
 const sessionKey = (id: string) => `session:${id}`;
 
+/**
+ * Ids of a user's signed-in sessions, so they can all be revoked (password reset). Every member's key expires within
+ * the session TTL of its last use, and the set's TTL is refreshed at the same moments, so the set outlives them all.
+ * A stale id left behind is harmless: deleting a missing session key is a no-op.
+ */
+const userSessionsKey = (userId: string) => `user:sessions:${userId}`;
+
 async function readSessionId(): Promise<string | undefined> {
   const value = (await cookies()).get(SESSION_COOKIE)?.value;
   return value && SESSION_ID_PATTERN.test(value) ? value : undefined;
@@ -45,7 +52,10 @@ async function writeCookie(id: string) {
 
 async function storeSession(data: SessionData): Promise<Session> {
   const id = randomBytes(32).toString("base64url");
-  await getRedis().set(sessionKey(id), JSON.stringify(data), "EX", sessionTtlSeconds());
+  const ttl = sessionTtlSeconds();
+  const tx = getRedis().multi().set(sessionKey(id), JSON.stringify(data), "EX", ttl);
+  if (data.userId) tx.sadd(userSessionsKey(data.userId), id).expire(userSessionsKey(data.userId), ttl);
+  await tx.exec();
   await writeCookie(id);
   return { id, data };
 }
@@ -66,11 +76,17 @@ export const getSession = cache(async (): Promise<Session | null> => {
   const raw = results?.[0]?.[1];
   if (typeof raw !== "string") return null;
 
+  let data: SessionData;
   try {
-    return { id, data: JSON.parse(raw) as SessionData };
+    data = JSON.parse(raw) as SessionData;
   } catch {
     return null;
   }
+  // SADD also enrolls sessions created before the per-user index existed.
+  if (data.userId) {
+    await getRedis().multi().sadd(userSessionsKey(data.userId), id).expire(userSessionsKey(data.userId), ttl).exec();
+  }
+  return { id, data };
 });
 
 /** Returns the current session, creating an anonymous one if needed. Server Functions and Route Handlers only. */
@@ -91,12 +107,31 @@ export async function rotateSession(data: Omit<SessionData, "createdAt">): Promi
       await redis.rename(cartKey(previous.id), cartKey(next.id));
     }
     await redis.del(sessionKey(previous.id));
+    if (previous.data.userId) await redis.srem(userSessionsKey(previous.data.userId), previous.id);
   }
   return next;
 }
 
 export async function destroySession() {
-  const id = await readSessionId();
-  if (id) await getRedis().del(sessionKey(id), cartKey(id));
+  const session = await getSession();
+  const id = session?.id ?? (await readSessionId());
+  if (id) {
+    const tx = getRedis().multi().del(sessionKey(id), cartKey(id));
+    if (session?.data.userId) tx.srem(userSessionsKey(session.data.userId), id);
+    await tx.exec();
+  }
   (await cookies()).delete(SESSION_COOKIE);
+}
+
+/** Signs the user out everywhere (e.g. after a password reset), except the session id in `keep`. Returns how many were revoked. */
+export async function revokeUserSessions(userId: string, keep?: string): Promise<number> {
+  const redis = getRedis();
+  const ids = (await redis.smembers(userSessionsKey(userId))).filter((id) => id !== keep);
+  if (ids.length === 0) return 0;
+  const results = await redis
+    .multi()
+    .del(...ids.map(sessionKey))
+    .srem(userSessionsKey(userId), ...ids)
+    .exec();
+  return Number(results?.[0]?.[1] ?? 0);
 }
