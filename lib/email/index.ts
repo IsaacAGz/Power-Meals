@@ -15,13 +15,17 @@ function getClient(): SESv2Client {
   return client;
 }
 
-export async function sendOrderEmail(input: { to: string; subject: string; text: string }): Promise<void> {
+export type EmailInput = { to: string; subject: string; text: string; replyTo?: string };
+
+/** Plain-text mail from ORDER_EMAIL_FROM, the one verified SES sender. */
+export async function sendEmail(input: EmailInput): Promise<void> {
   const from = process.env.ORDER_EMAIL_FROM?.trim();
   if (!from) throw new Error("ORDER_EMAIL_FROM is not set");
   await getClient().send(
     new SendEmailCommand({
       FromEmailAddress: from,
       Destination: { ToAddresses: [input.to] },
+      ...(input.replyTo ? { ReplyToAddresses: [input.replyTo] } : {}),
       Content: {
         Simple: {
           Subject: { Data: input.subject, Charset: "UTF-8" },
@@ -31,4 +35,8 @@ export async function sendOrderEmail(input: { to: string; subject: string; text:
     }),
     { abortSignal: AbortSignal.timeout(SEND_TIMEOUT_MS) },
   );
+}
+
+export async function sendOrderEmail(input: { to: string; subject: string; text: string }): Promise<void> {
+  await sendEmail(input);
 }

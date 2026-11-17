@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Dark mode is a class on <html>, set before paint by the script in app/layout.tsx. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-ink: #111111;
   --color-paper: #ffffff;
@@ -9,6 +12,12 @@
   --color-muted: #5e5a52;
   --color-line: rgba(17, 17, 17, 0.08);
   --color-line-strong: rgba(17, 17, 17, 0.16);
+  --color-placeholder: #efeadf;
+  --color-danger: #b42318;
+
+  /* Never flip with the theme: text over photos, map pins, always-dark brand bands. */
+  --color-night: #0e0e0e;
+  --color-day: #f5f1e8;
 
   --radius-control: 6px;
   --radius-frame: 12px;
@@ -22,8 +31,32 @@
   --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
 }
 
+/* The light tokens above are roles (cream = page, paper = card, ink = text and inverse surface), so redefining
+   them here themes every utility without per-component dark: classes. */
+.dark {
+  --color-ink: #f3efe6;
+  --color-paper: #171717;
+  --color-cream: #0e0e0e;
+  --color-power-deep: #ffd23a;
+  --color-muted: #a39e93;
+  --color-line: rgba(255, 255, 255, 0.1);
+  --color-line-strong: rgba(255, 255, 255, 0.18);
+  --color-placeholder: #1f1f1f;
+  --color-danger: #f97066;
+  color-scheme: dark;
+}
+
+/* Theme switch (components/ThemeToggle.tsx): the new snapshot is revealed with a clip-path circle from the button,
+   so the default cross-fade is turned off and the old snapshot stays still underneath. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
 @layer base {
   html {
+    color-scheme: light;
     background-color: var(--color-cream);
     color: var(--color-ink);
     -webkit-tap-highlight-color: transparent;
@@ -107,7 +140,7 @@
 }
 
 .maplibregl-cooperative-gesture-screen {
-  background: rgba(17, 17, 17, 0.72);
+  background: rgba(14, 14, 14, 0.72);
   font-family: var(--font-sans);
   font-size: 15px;
 }

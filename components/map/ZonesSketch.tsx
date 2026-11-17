@@ -24,7 +24,7 @@ export function ZonesSketch({ showPickupPoints = true, className = "" }: { showP
           const [x, y] = project(point.coordinates);
           return (
             <g key={point.slug}>
-              <rect x={+x - 10} y={+y - 10} width={20} height={20} rx={5} fill="#111111" />
+              <rect x={+x - 10} y={+y - 10} width={20} height={20} rx={5} className="fill-night stroke-day" strokeWidth={2} />
               <text x={+x} y={+y - 22} textAnchor="middle" fontSize={22} fontWeight={600} className="fill-ink font-sans">
                 {point.name}
               </text>

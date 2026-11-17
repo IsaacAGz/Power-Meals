@@ -46,7 +46,7 @@ function Hero() {
         <div className="flex flex-col justify-center pt-28 pb-12 lg:pt-24 lg:pr-12 lg:pb-16">
           <Reveal onMount>
             <p className="inline-flex items-center gap-2 text-[15px] font-semibold text-ink">
-              <Image src="/logo.svg" alt="" width={22} height={22} className="size-[22px]" />
+              <Image src="/brand/power-meals-mark.svg" alt="" width={22} height={22} className="size-[22px]" />
               Power Meals, Tijuana
             </p>
           </Reveal>
@@ -106,19 +106,19 @@ function HowItWorks({ openpayEnabled }: { openpayEnabled: boolean }) {
 
         <div className="mt-14 grid gap-4 md:grid-cols-3 md:grid-rows-2">
           <Reveal className="md:col-span-2 md:row-span-2">
-            <article className="relative flex h-full min-h-[440px] flex-col justify-end overflow-hidden rounded-frame bg-[#EFEADF] p-8 md:p-10">
+            <article className="relative flex h-full min-h-[440px] flex-col justify-end overflow-hidden rounded-frame bg-placeholder p-8 md:p-10">
               <Image
-                src="/images/platillo-res-chimichurri.jpg"
+                src="/images/como-funciona-elige.jpg"
                 alt=""
                 fill
                 sizes="(min-width: 768px) 66vw, 100vw"
                 className="object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#111111]/80 via-[#111111]/25 to-transparent" />
-              <div className="relative max-w-[40ch] text-cream">
+              <div className="absolute inset-0 bg-gradient-to-t from-night/80 via-night/25 to-transparent" />
+              <div className="relative max-w-[40ch] text-day">
                 <ForkKnife weight="bold" className="size-7 text-power" aria-hidden />
                 <h3 className="mt-4 font-display text-4xl font-extrabold tracking-tight">Elige</h3>
-                <p className="mt-2 text-[16px] leading-relaxed text-cream/85">
+                <p className="mt-2 text-[16px] leading-relaxed text-day/85">
                   Arma cada platillo con tu proteína, base y tamaño, o elige un paquete para la semana.
                 </p>
               </div>
@@ -182,7 +182,7 @@ function MenuRow({ items }: { items: MenuCard[] }) {
           {items.map((item) => (
             <li key={item.slug} className="group w-[78vw] max-w-[340px] shrink-0 snap-start">
               <Link href={`/pedido?plantilla=${item.slug}`} className="block rounded-frame">
-                <div className="relative aspect-[4/5] overflow-hidden rounded-frame bg-[#EFEADF]">
+                <div className="relative aspect-[4/5] overflow-hidden rounded-frame bg-placeholder">
                   <Image
                     src={item.imageUrl}
                     alt={item.name}

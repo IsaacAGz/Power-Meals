@@ -74,7 +74,7 @@ export function MenuBrowser({ items, filters }: { items: MenuCard[]; filters: { 
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
                   className="group flex flex-col"
                 >
-                  <div className="relative aspect-[4/3] overflow-hidden rounded-frame bg-[#EFEADF]">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-frame bg-placeholder">
                     <Image
                       src={item.imageUrl}
                       alt={item.name}

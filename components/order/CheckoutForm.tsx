@@ -361,7 +361,7 @@ export function CheckoutForm({
           . Si escribes alergias o datos de salud en las notas, nos autorizas a usarlos solo para preparar tu pedido.
         </p>
         {message && (
-          <p role="alert" className="flex items-start gap-2 text-sm font-medium text-[#B42318]">
+          <p role="alert" className="flex items-start gap-2 text-sm font-medium text-danger">
             <WarningCircle weight="bold" className="mt-0.5 size-4 shrink-0" aria-hidden />
             {message}
           </p>

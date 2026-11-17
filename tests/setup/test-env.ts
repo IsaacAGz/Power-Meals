@@ -28,6 +28,7 @@ export function applyTestEnv() {
     NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
     PASSWORD_PEPPER: "test-pepper-test-pepper-test-pepper-0000",
     ORDER_EMAIL_FROM: "pedidos@powermeals.test",
+    CONTACT_EMAIL_TO: "partners@powermeals.test",
     TURNSTILE_SECRET_KEY: "test-secret",
     AWS_REGION: "us-west-2",
     // Off unless a test turns them on.

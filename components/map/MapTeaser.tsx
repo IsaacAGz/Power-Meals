@@ -9,7 +9,7 @@ import { buttonDark, container } from "@/lib/ui";
 
 const BrandMap = dynamic(() => import("./BrandMap"), {
   ssr: false,
-  loading: () => <div aria-hidden className="absolute inset-0 bg-[#EFEADF]" />,
+  loading: () => <div aria-hidden className="absolute inset-0 bg-placeholder" />,
 });
 
 export function MapTeaser() {
@@ -36,7 +36,7 @@ export function MapTeaser() {
 
   return (
     <section aria-labelledby="teaser-mapa" className="relative">
-      <div ref={ref} className="relative h-[560px] w-full bg-[#EFEADF] md:h-[520px]">
+      <div ref={ref} className="relative h-[560px] w-full bg-placeholder md:h-[520px]">
         {visible && (
           <BrandMap
             interactive={false}

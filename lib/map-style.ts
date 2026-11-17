@@ -1,17 +1,45 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
 
-export const MAP_COLORS = {
+export type MapColors = {
+  land: string;
+  water: string;
+  park: string;
+  building: string;
+  road: string;
+  casing: string;
+  boundary: string;
+  label: string;
+  halo: string;
+};
+
+export const MAP_COLORS: MapColors = {
   land: "#F5F1E8",
   water: "#E4DDCD",
   park: "#ECE6D8",
   building: "#EEE9DE",
   road: "#FFFFFF",
   casing: "rgba(17,17,17,0.08)",
+  boundary: "rgba(17,17,17,0.18)",
   label: "#111111",
   halo: "#F5F1E8",
-  power: "#F5C400",
-  ink: "#111111",
-} as const;
+};
+
+export const MAP_COLORS_DARK: MapColors = {
+  land: "#121212",
+  water: "#1B1D20",
+  park: "#161A15",
+  building: "#1A1A1A",
+  road: "#262626",
+  casing: "rgba(255,255,255,0.06)",
+  boundary: "rgba(255,255,255,0.16)",
+  label: "#E9E4D8",
+  halo: "#0E0E0E",
+};
+
+/** The palette for the theme currently on <html> (see components/ThemeToggle.tsx). */
+export function currentMapColors(): MapColors {
+  return document.documentElement.classList.contains("dark") ? MAP_COLORS_DARK : MAP_COLORS;
+}
 
 /** OpenFreeMap Positron: free, no key. Tiles, fonts and sprites all come from tiles.openfreemap.org (see the CSP). */
 export const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
@@ -32,7 +60,7 @@ function paint(map: MapLibreMap, layer: string, property: PaintProperty, value: 
   }
 }
 
-export function applyBrandStyle(map: MapLibreMap) {
+export function applyBrandStyle(map: MapLibreMap, colors: MapColors = MAP_COLORS) {
   const layers = map.getStyle()?.layers ?? [];
 
   for (const layer of layers) {
@@ -47,28 +75,28 @@ export function applyBrandStyle(map: MapLibreMap) {
 
     switch (layer.type) {
       case "background":
-        paint(map, layer.id, "background-color", MAP_COLORS.land);
+        paint(map, layer.id, "background-color", colors.land);
         break;
       case "fill":
-        if (WATER.test(key)) paint(map, layer.id, "fill-color", MAP_COLORS.water);
-        else if (PARK.test(key)) paint(map, layer.id, "fill-color", MAP_COLORS.park);
-        else if (/building/.test(key)) paint(map, layer.id, "fill-color", MAP_COLORS.building);
-        else paint(map, layer.id, "fill-color", MAP_COLORS.land);
+        if (WATER.test(key)) paint(map, layer.id, "fill-color", colors.water);
+        else if (PARK.test(key)) paint(map, layer.id, "fill-color", colors.park);
+        else if (/building/.test(key)) paint(map, layer.id, "fill-color", colors.building);
+        else paint(map, layer.id, "fill-color", colors.land);
         paint(map, layer.id, "fill-outline-color", "rgba(0,0,0,0)");
         break;
       case "line":
         if (WATER.test(key)) {
-          paint(map, layer.id, "line-color", MAP_COLORS.water);
+          paint(map, layer.id, "line-color", colors.water);
         } else if (ROAD.test(key)) {
-          paint(map, layer.id, "line-color", CASING.test(key) ? MAP_COLORS.casing : MAP_COLORS.road);
+          paint(map, layer.id, "line-color", CASING.test(key) ? colors.casing : colors.road);
         } else if (/boundary|admin/.test(key)) {
-          paint(map, layer.id, "line-color", "rgba(17,17,17,0.18)");
+          paint(map, layer.id, "line-color", colors.boundary);
         }
         break;
       case "symbol":
-        paint(map, layer.id, "text-color", MAP_COLORS.label);
+        paint(map, layer.id, "text-color", colors.label);
         paint(map, layer.id, "text-opacity", 0.75);
-        paint(map, layer.id, "text-halo-color", MAP_COLORS.halo);
+        paint(map, layer.id, "text-halo-color", colors.halo);
         paint(map, layer.id, "text-halo-width", 1.4);
         paint(map, layer.id, "icon-opacity", 0);
         break;

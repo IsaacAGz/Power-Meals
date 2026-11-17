@@ -48,9 +48,9 @@ export const baseSeed = [
   { slug: "ensalada", name: "Ensalada", hasCarbPortion: false, includesVeggies: false, allowsDoubleCarb: false },
 ] as const;
 
-// Placeholder photos until the menu shoot; reuse the closest existing image per protein.
+// Menu photos per protein; proteins without a new photo in public/images/menu/ still use an older placeholder.
 const imageFor: Record<string, string> = {
-  pollo: "/images/platillo-pollo-arroz.jpg",
+  pollo: "/images/menu/pollo.jpg",
   molida: "/images/platillo-pavo-camote.jpg",
   basa: "/images/platillo-tacos-camaron.jpg",
   asada: "/images/platillo-res-chimichurri.jpg",

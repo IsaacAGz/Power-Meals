@@ -6,7 +6,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { useReducedMotion } from "motion/react";
 import { Lightning } from "@phosphor-icons/react";
 import type { Map as MapLibreMap } from "maplibre-gl";
-import { applyBrandStyle, MAP_STYLE_URL } from "@/lib/map-style";
+import { applyBrandStyle, currentMapColors, MAP_STYLE_URL } from "@/lib/map-style";
+import { THEME_EVENT } from "@/lib/theme";
 import { getMapPin, MAP_CENTER, MAP_ZOOM, mapPins, pointsBounds } from "@/lib/locations-data";
 import { buildWhatsAppUrl, PICKUP_QUESTION_MESSAGE } from "@/lib/whatsapp";
 import { ZonesSketch } from "./ZonesSketch";
@@ -95,7 +96,7 @@ export default function BrandMap({
 
       map.on("style.load", () => {
         if (!map) return;
-        applyBrandStyle(map);
+        applyBrandStyle(map, currentMapColors());
       });
 
       map.on("load", () => {
@@ -108,9 +109,9 @@ export default function BrandMap({
           const element = document.createElement("button");
           element.type = "button";
           element.className =
-            "flex size-9 cursor-pointer items-center justify-center rounded-[12px] border-0 bg-ink p-0 text-power ring-2 ring-cream";
+            "flex size-9 cursor-pointer items-center justify-center rounded-[12px] border-0 bg-night p-0 text-power ring-2 ring-day";
           element.setAttribute("aria-label", `Cocina: ${point.name}`);
-          if (selectedRef.current === point.slug) element.classList.replace("ring-cream", "ring-power");
+          if (selectedRef.current === point.slug) element.classList.replace("ring-day", "ring-power");
           element.addEventListener("click", () => onPointClickRef.current?.(point.slug));
           const root = createRoot(element);
           root.render(<Lightning weight="bold" className="size-[18px]" />);
@@ -156,6 +157,15 @@ export default function BrandMap({
   }, [interactive, showPickupPoints]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    const recolor = () => {
+      const map = mapRef.current;
+      if (map?.isStyleLoaded()) applyBrandStyle(map, currentMapColors());
+    };
+    window.addEventListener(THEME_EVENT, recolor);
+    return () => window.removeEventListener(THEME_EVENT, recolor);
+  }, []);
+
+  useEffect(() => {
     const map = mapRef.current;
     if (!map || !interactive) return;
     if (cooperativeGestures) map.cooperativeGestures.enable();
@@ -168,7 +178,7 @@ export default function BrandMap({
     markerEls.current.forEach((element, slug) => {
       const selected = slug === selectedPoint;
       element.classList.toggle("ring-power", selected);
-      element.classList.toggle("ring-cream", !selected);
+      element.classList.toggle("ring-day", !selected);
     });
     if (!map || status !== "ready") return;
 
@@ -184,7 +194,7 @@ export default function BrandMap({
       <div ref={containerRef} className="size-full" aria-label="Mapa de cocinas en Tijuana" />
 
       {status === "loading" && (
-        <div aria-hidden className="absolute inset-0 bg-[#EFEADF] motion-safe:animate-pulse" />
+        <div aria-hidden className="absolute inset-0 bg-placeholder motion-safe:animate-pulse" />
       )}
 
       {status === "error" && (
@@ -204,7 +214,7 @@ function MapFallback({
   showPickupPoints: boolean;
 }) {
   return (
-    <div className="absolute inset-0 bg-[#EFEADF]">
+    <div className="absolute inset-0 bg-placeholder">
       <div
         className="absolute"
         style={

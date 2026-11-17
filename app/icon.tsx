@@ -14,15 +14,21 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#111111",
+          background: "#0E0E0E",
         }}
       >
-        <svg width="22" height="22" viewBox="0 0 32 32">
-          <path
-            d="M18.5 2L8 17.5h6.2L13.5 30 24 14.5h-6.4L18.5 2z"
-            fill="#F5C400"
-          />
-        </svg>
+        <div
+          style={{
+            display: "flex",
+            color: "#F5C400",
+            fontSize: 17,
+            fontWeight: 800,
+            fontStyle: "italic",
+            letterSpacing: -1,
+          }}
+        >
+          PM
+        </div>
       </div>
     ),
     { ...size },

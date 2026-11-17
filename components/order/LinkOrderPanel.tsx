@@ -92,7 +92,7 @@ export function LinkOrderPanel({
   }
 
   const alert = message && (
-    <p role="alert" className="flex items-start gap-2 text-sm font-medium text-[#B42318]">
+    <p role="alert" className="flex items-start gap-2 text-sm font-medium text-danger">
       <WarningCircle weight="bold" className="mt-0.5 size-4 shrink-0" aria-hidden />
       {message}
     </p>
@@ -142,11 +142,11 @@ export function LinkOrderPanel({
               />
             )}
           </FormField>
-          {errors.email && <p className="text-sm font-medium text-[#B42318]">{errors.email}</p>}
+          {errors.email && <p className="text-sm font-medium text-danger">{errors.email}</p>}
           {siteKey ? (
             <TurnstileField key={turnstileKey} onToken={setTurnstileToken} />
           ) : (
-            <p className="text-sm font-medium text-[#B42318]">No podemos crear la cuenta en este momento. Intenta más tarde.</p>
+            <p className="text-sm font-medium text-danger">No podemos crear la cuenta en este momento. Intenta más tarde.</p>
           )}
           {alert}
           <p className="text-[13px] text-muted">

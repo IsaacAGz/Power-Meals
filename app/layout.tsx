@@ -5,6 +5,7 @@ import { ConditionalFooter } from "@/components/ConditionalFooter";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { publicSiteUrl } from "@/lib/site";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -45,13 +46,20 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#F5F1E8",
-  colorScheme: "light",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F5F1E8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0E0E0E" },
+  ],
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es-MX" className={`${geistSans.variable} ${geistMono.variable} ${cabinet.variable} antialiased`}>
+    <html lang="es-MX" className={`${geistSans.variable} ${geistMono.variable} ${cabinet.variable} antialiased`} suppressHydrationWarning>
+      <head>
+        {/* Sets the dark class before first paint (CSP allows inline scripts, next.config.ts). */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="flex min-h-[100dvh] flex-col bg-cream text-ink">
         <a
           href="#contenido"

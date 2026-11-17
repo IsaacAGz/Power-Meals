@@ -172,11 +172,11 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
 
       {mode === "register" && siteKey && <TurnstileField key={turnstileKey} onToken={setTurnstileToken} />}
       {mode === "register" && !siteKey && (
-        <p className="text-sm font-medium text-[#B42318]">No podemos crear la cuenta en este momento. Intenta más tarde.</p>
+        <p className="text-sm font-medium text-danger">No podemos crear la cuenta en este momento. Intenta más tarde.</p>
       )}
 
       {message && (
-        <p role="alert" className="flex items-start gap-2 text-sm font-medium text-[#B42318]">
+        <p role="alert" className="flex items-start gap-2 text-sm font-medium text-danger">
           <WarningCircle weight="bold" className="mt-0.5 size-4 shrink-0" aria-hidden />
           {message}
         </p>

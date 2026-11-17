@@ -33,7 +33,7 @@ export default async function PedidoCancelPage({ searchParams }: PageProps<"/ped
       <div className={container}>
         <div className="mx-auto flex max-w-[760px] flex-col gap-10">
           <header>
-            <WarningCircle weight="bold" className="size-10 text-[#B42318]" aria-hidden />
+            <WarningCircle weight="bold" className="size-10 text-danger" aria-hidden />
             <h1 className="mt-5 font-display text-5xl leading-[1] font-extrabold tracking-[-0.03em] md:text-6xl">
               Tu pago no se completó
             </h1>

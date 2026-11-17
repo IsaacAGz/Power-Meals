@@ -1,5 +1,5 @@
 /** Public pages, for the sitemap. Account, kitchen, checkout-return and token pages are left out (app/robots.ts). */
-export const PUBLIC_PAGES = ["/", "/menu", "/pedido", "/ubicaciones", "/nosotros", "/proyectos", "/aviso-de-privacidad"] as const;
+export const PUBLIC_PAGES = ["/", "/menu", "/pedido", "/ubicaciones", "/nosotros", "/proyectos", "/contacto", "/aviso-de-privacidad"] as const;
 
 /** Paths crawlers should skip: private or session-bound pages, token links, and the API. */
 export const CRAWL_DISALLOW = [

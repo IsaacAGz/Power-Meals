@@ -38,7 +38,7 @@ export function ReorderButton({ orderId }: { orderId: string }) {
         Pedir de nuevo
       </button>
       {error && (
-        <p role="alert" className="max-w-[28ch] text-right text-[13px] text-[#B42318]">
+        <p role="alert" className="max-w-[28ch] text-right text-[13px] text-danger">
           {error}
         </p>
       )}

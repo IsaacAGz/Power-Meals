@@ -30,7 +30,7 @@ export function FormField({
         </p>
       )}
       {error && (
-        <p id={errorId} className="text-[13px] font-medium text-[#B42318]">
+        <p id={errorId} className="text-[13px] font-medium text-danger">
           {error}
         </p>
       )}

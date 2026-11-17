@@ -10,6 +10,7 @@ const links = [
   { href: "/menu", label: "Menú y precios" },
   { href: "/ubicaciones", label: "Ubicaciones" },
   { href: "/proyectos", label: "Proyectos" },
+  { href: "/contacto", label: "Gimnasios, oficinas y catering" },
   { href: "/pedido", label: "Pedir" },
 ];
 

@@ -335,7 +335,7 @@ psql "$DATABASE_URL" -c "select o.order_number, d.status, d.attempts, d.last_err
 
 ### Paid-order email (SES)
 
-The first transition to paid messages the customer once, with the receipt link. An order with an email is sent through SES. An order with a phone and no email is sent through the WhatsApp Cloud API (`WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, and `WHATSAPP_TEMPLATE_NAME` for an approved es_MX utility template whose body variables are first name, order number, and receipt link). Later kitchen steps do not send again. Give the EC2 role `ses:SendEmail` for the verified identity, set `ORDER_EMAIL_FROM` to that from-address (same `AWS_REGION` as SQS), and install the retry timer. A channel left unset records the row as `skipped`, so setting it later does not message old orders.
+The first transition to paid messages the customer once, with the receipt link. An order with an email is sent through SES. An order with a phone and no email is sent through the WhatsApp Cloud API (`WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, and `WHATSAPP_TEMPLATE_NAME` for an approved es_MX utility template whose body variables are first name, order number, and receipt link). Later kitchen steps do not send again. Give the EC2 role `ses:SendEmail` for the verified identity, set `ORDER_EMAIL_FROM` to that from-address (same `AWS_REGION` as SQS), and install the retry timer. A channel left unset records the row as `skipped`, so setting it later does not message old orders. The `/contacto` form sends from that same address to `CONTACT_EMAIL_TO`; while SES is in sandbox mode, verify that inbox as an identity too.
 
 ```bash
 sudo cp deploy/systemd/power-meals-notify.service deploy/systemd/power-meals-notify.timer /etc/systemd/system/
@@ -403,7 +403,7 @@ On every uncached behavior below, use the **AllViewer** origin request policy, s
 | Path pattern | Cache policy | Notes |
 |--------------|--------------|-------|
 | `/_next/static/*` | CachingOptimized | Hashed filenames, immutable |
-| `/images/*`, `/maplibre/*`, `/logo.svg` | CachingOptimized | Public assets |
+| `/images/*`, `/maplibre/*`, `/brand/*` | CachingOptimized | Public assets |
 | `/api/*` | CachingDisabled | Forward all headers, cookies, query strings |
 | `/kitchen/*`, `/cuenta*`, `/historial*`, `/ingresar*`, `/registro*`, `/pedido*` | CachingDisabled | Session-bound pages; `/pedido*` also covers the Openpay return pages, which must forward the `order_ref` and `id` query strings |
 | `/monitoring*` | CachingDisabled | Sentry tunnel: browser errors are POSTed here, so allow all HTTP methods |

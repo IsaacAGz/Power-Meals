@@ -154,7 +154,7 @@ export function KitchenBoard({ initial }: { initial: KitchenBoard }) {
       </div>
 
       {error && (
-        <p role="alert" className="mt-4 text-sm font-medium text-[#B42318]">
+        <p role="alert" className="mt-4 text-sm font-medium text-danger">
           {error}
         </p>
       )}

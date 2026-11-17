@@ -3,14 +3,14 @@ const buttonBase =
 
 export const buttonPrimary = `${buttonBase} bg-power text-ink hover:bg-power-deep`;
 export const buttonSecondary = `${buttonBase} border border-ink text-ink hover:bg-ink hover:text-cream`;
-export const buttonDark = `${buttonBase} bg-ink text-cream hover:bg-[#2a2a2a]`;
+export const buttonDark = `${buttonBase} bg-ink text-cream hover:bg-ink/85`;
 
 export const container = "mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-10";
 
 export const inputBase =
   "w-full rounded-control border bg-paper px-3.5 text-[15px] text-ink placeholder:text-muted transition-colors focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink";
 export const inputClass = (invalid: boolean) =>
-  `${inputBase} h-12 ${invalid ? "border-[#B42318]" : "border-line-strong"}`;
+  `${inputBase} h-12 ${invalid ? "border-danger" : "border-line-strong"}`;
 
 export const textLink =
   "font-semibold text-ink underline decoration-power decoration-2 underline-offset-4 transition-colors hover:decoration-ink";

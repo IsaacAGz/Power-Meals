@@ -13,16 +13,20 @@ vi.mock("next/headers", () => ({
 }));
 
 // SES: record instead of sending. Set emailFailures.next to make the next N sends throw.
-vi.mock("@/lib/email", () => ({
-  isOrderEmailConfigured: () => Boolean(process.env.ORDER_EMAIL_FROM?.trim()),
-  sendOrderEmail: async (input: { to: string; subject: string; text: string }) => {
+vi.mock("@/lib/email", () => {
+  const send = async (input: { to: string; subject: string; text: string; replyTo?: string }) => {
     if (emailFailures.next > 0) {
       emailFailures.next -= 1;
       throw new Error("SES is down");
     }
     sentEmails.push(input);
-  },
-}));
+  };
+  return {
+    isOrderEmailConfigured: () => Boolean(process.env.ORDER_EMAIL_FROM?.trim()),
+    sendEmail: send,
+    sendOrderEmail: send,
+  };
+});
 
 // Turnstile: the token "pass" is a solved challenge; anything else fails.
 vi.mock("@/lib/auth/turnstile", () => ({

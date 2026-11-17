@@ -77,10 +77,10 @@ export function ResetRequestForm() {
       {siteKey ? (
         <TurnstileField key={turnstileKey} onToken={setTurnstileToken} />
       ) : (
-        <p className="text-sm font-medium text-[#B42318]">No podemos enviar el enlace en este momento. Intenta más tarde.</p>
+        <p className="text-sm font-medium text-danger">No podemos enviar el enlace en este momento. Intenta más tarde.</p>
       )}
       {message && (
-        <p role="alert" className="flex items-start gap-2 text-sm font-medium text-[#B42318]">
+        <p role="alert" className="flex items-start gap-2 text-sm font-medium text-danger">
           <WarningCircle weight="bold" className="mt-0.5 size-4 shrink-0" aria-hidden />
           {message}
         </p>

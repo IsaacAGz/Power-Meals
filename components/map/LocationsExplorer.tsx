@@ -8,7 +8,7 @@ import { mapPins } from "@/lib/locations-data";
 
 const BrandMap = dynamic(() => import("./BrandMap"), {
   ssr: false,
-  loading: () => <div aria-hidden className="absolute inset-0 rounded-frame bg-[#EFEADF]" />,
+  loading: () => <div aria-hidden className="absolute inset-0 rounded-frame bg-placeholder" />,
 });
 
 function useIsDesktop() {
@@ -56,7 +56,7 @@ export function LocationsExplorer() {
                     aria-pressed={active}
                     className="flex w-full items-start gap-4 rounded-control text-left"
                   >
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-frame bg-ink text-power">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-frame bg-night text-power">
                       <Lightning weight="bold" className="size-5" />
                     </span>
                     <span>

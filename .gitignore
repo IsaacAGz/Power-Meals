@@ -50,3 +50,6 @@ next-env.d.ts
 
 .agents
 .cursor
+
+# Original brand art and AI generations (large); the site uses the optimized copies in public/
+/design/

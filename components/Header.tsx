@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { List, UserCircle, X } from "@phosphor-icons/react";
 import { LogoutButton } from "./auth/LogoutButton";
 import { Logo } from "./Logo";
+import { ThemeToggle } from "./ThemeToggle";
 import { buttonPrimary, container } from "@/lib/ui";
 
 const navLinks = [
@@ -13,6 +14,7 @@ const navLinks = [
   { href: "/menu", label: "Menú" },
   { href: "/ubicaciones", label: "Ubicaciones" },
   { href: "/proyectos", label: "Proyectos" },
+  { href: "/contacto", label: "Contacto" },
 ];
 
 export function Header() {
@@ -41,7 +43,10 @@ export function Header() {
       <header className="sticky top-0 z-40 border-b border-line bg-cream/90 backdrop-blur-md">
         <div className={`${container} flex h-16 items-center justify-between gap-6`}>
           <Logo />
-          <LogoutButton className="h-10 px-3 text-sm" />
+          <div className="flex items-center gap-2">
+            <ThemeToggle className="border border-line-strong hover:border-ink" />
+            <LogoutButton className="h-10 px-3 text-sm" />
+          </div>
         </div>
       </header>
     );
@@ -72,6 +77,7 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-2">
+            <ThemeToggle className="border border-line-strong hover:border-ink" />
             <Link
               href="/cuenta"
               aria-label="Mi cuenta"

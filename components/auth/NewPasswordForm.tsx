@@ -63,7 +63,7 @@ export function NewPasswordForm({ token }: { token: string }) {
       </FormField>
       {message && (
         <div role="alert" className="flex flex-col gap-2">
-          <p className="flex items-start gap-2 text-sm font-medium text-[#B42318]">
+          <p className="flex items-start gap-2 text-sm font-medium text-danger">
             <WarningCircle weight="bold" className="mt-0.5 size-4 shrink-0" aria-hidden />
             {message}
           </p>

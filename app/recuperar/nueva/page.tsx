@@ -19,7 +19,7 @@ export default async function NuevaContrasenaPage({ searchParams }: PageProps<"/
         <NewPasswordForm token={value} />
       ) : (
         <div className="flex flex-col gap-3">
-          <p role="alert" className="text-sm font-medium text-[#B42318]">
+          <p role="alert" className="text-sm font-medium text-danger">
             Este enlace no es válido o ya venció.
           </p>
           <Link href="/recuperar" className={textLink}>

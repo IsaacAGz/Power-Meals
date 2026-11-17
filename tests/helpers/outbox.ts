@@ -1,5 +1,5 @@
 /** Every email the app tried to send in this test, in order. */
-export const sentEmails: { to: string; subject: string; text: string }[] = [];
+export const sentEmails: { to: string; subject: string; text: string; replyTo?: string }[] = [];
 
 export const emailFailures = { next: 0 };
 

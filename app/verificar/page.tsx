@@ -57,7 +57,7 @@ export default function VerificarPage() {
   return (
     <AuthShell title="Confirma tu correo" intro="Estamos abriendo tu cuenta.">
       {message ? (
-        <p role="alert" className="text-sm font-medium text-[#B42318]">
+        <p role="alert" className="text-sm font-medium text-danger">
           {message}
         </p>
       ) : (

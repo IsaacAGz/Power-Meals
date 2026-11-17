@@ -151,7 +151,7 @@ export function OrderExperience({
           {notice && (
             <p
               role={notice.tone === "error" ? "alert" : "status"}
-              className={`mb-4 flex items-center gap-2 text-sm font-medium ${notice.tone === "error" ? "text-[#B42318]" : "text-ink"}`}
+              className={`mb-4 flex items-center gap-2 text-sm font-medium ${notice.tone === "error" ? "text-danger" : "text-ink"}`}
             >
               {notice.tone === "error" ? (
                 <WarningCircle weight="bold" className="size-4 shrink-0" aria-hidden />
