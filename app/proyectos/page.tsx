@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import { Globe, InstagramLogo } from "@phosphor-icons/react/dist/ssr";
 import { PartnerMark, type PartnerShape } from "@/components/PartnerMark";
 import { Reveal } from "@/components/Reveal";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
@@ -10,6 +11,29 @@ export const metadata: Metadata = {
   title: "Proyectos",
   description: "Gimnasios, estudios y oficinas de Tijuana que trabajan con Power Meals.",
 };
+
+type PartnerLink = { kind: "web" | "instagram"; href: string };
+
+/** Real partners, shown first with their logo (a square image in public/images) and links. */
+const brands: { name: string; kind: string; logo: string; links: PartnerLink[] }[] = [
+  {
+    name: "Casa Toro",
+    kind: "Renta de cabañas",
+    logo: "/images/casa_toro.jpg",
+    links: [
+      { kind: "web", href: "https://casa-toro-eight.vercel.app/en/" },
+      { kind: "instagram", href: "https://www.instagram.com/casatorovalle/" },
+    ],
+  },
+  {
+    name: "Carreta 22",
+    kind: "Restaurantes",
+    logo: "/images/carreta_22.jpg",
+    links: [{ kind: "instagram", href: "https://www.instagram.com/carreta.22/" }],
+  },
+];
+
+const linkLabel = { web: "Sitio web", instagram: "Instagram" } as const;
 
 // Placeholder partners and case studies: replace with real partners before launch.
 const partners: { name: string; shape: PartnerShape }[] = [
@@ -56,6 +80,42 @@ export default function ProyectosPage() {
 
           <Reveal delay={0.12}>
             <ul className="mt-16 grid grid-cols-1 overflow-hidden rounded-frame border border-line-strong bg-paper sm:grid-cols-2 lg:grid-cols-3">
+              {brands.map((brand) => (
+                <li
+                  key={brand.name}
+                  className="-mr-px -mb-px flex min-h-32 items-center gap-4 border-r border-b border-line px-6 py-5"
+                >
+                  <Image
+                    src={brand.logo}
+                    alt={`Logo de ${brand.name}`}
+                    width={64}
+                    height={64}
+                    className="size-16 shrink-0 rounded-control object-cover"
+                  />
+                  <div className="min-w-0">
+                    <p className="font-display text-xl font-extrabold tracking-tight text-ink">{brand.name}</p>
+                    <p className="text-[13px] text-muted">{brand.kind}</p>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                      {brand.links.map((link) => {
+                        const Icon = link.kind === "web" ? Globe : InstagramLogo;
+                        return (
+                          <a
+                            key={link.href}
+                            href={link.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`${brand.name}: ${linkLabel[link.kind]} (se abre en otra pestaña)`}
+                            className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-ink underline decoration-power decoration-2 underline-offset-4 transition-colors hover:decoration-ink"
+                          >
+                            <Icon weight="bold" className="size-4" aria-hidden />
+                            {linkLabel[link.kind]}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </li>
+              ))}
               {partners.map((partner) => (
                 <li
                   key={partner.name}
