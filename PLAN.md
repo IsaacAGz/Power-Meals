@@ -36,25 +36,28 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 
 - [x] Sentry project and DSN
 - [x] Healthchecks.io: `notify-timer`, `dispatch-timer`, `watchdog`, `backup`, and the printer checks `printer-zona-rio`, `printer-otay`, `printer-monarca` and `printer-punto` (Rio Tijuana 3ra Etapa). They stay in the "new" state, which does not alert, until the server or the kitchen PC first pings them
-- [ ] UptimeRobot account (monitors are added at launch)
+- [x] UptimeRobot account, alert email verified 2026-11-24 (monitors are added at launch)
 - [x] SES: `powermealstj.com` verified, sending from `pedidos@powermealstj.com` in `us-west-2`, production access. Confirmed 2026-11-16 by `npm run email:test` to an unverified inbox
 - [x] Cloudflare Turnstile widget for `powermealstj.com` (subdomains included) and `localhost`; keys go into the server `.env`
-- [ ] EC2 instance role: `CloudWatchAgentServerPolicy`, the backup bucket policy, and `ses:SendEmail` on `identity/powermealstj.com`, `identity/pedidos@powermealstj.com` **and** `configuration-set/my-first-configuration-set` (the domain's default set; SES checks it too), with the condition `ses:FromAddress = pedidos@powermealstj.com`. The local `powermeals-ses-local` user has the same statement
-- [ ] Backup S3 bucket with versioning and the 30-day lifecycle rule; DLM policy for daily EBS snapshots
+- [x] EC2 instance role `power-meals-ec2`, created 2026-11-24 ahead of the launch: `AmazonSSMManagedInstanceCore`, `CloudWatchAgentServerPolicy`, the backup bucket policy, and `ses:SendEmail` on `identity/powermealstj.com`, `identity/pedidos@powermealstj.com` **and** `configuration-set/my-first-configuration-set` (the domain's default set; SES checks it too), with the condition `ses:FromAddress = pedidos@powermealstj.com`. The local `powermeals-ses-local` user has the same statement
+- [x] Backup S3 bucket `power-meals-backups-<account-id>` in `us-west-2` with versioning, encryption, public access blocked and the 30-day lifecycle rule; DLM policy `power-meals daily` (7 snapshots) for volumes tagged `Backup=power-meals`. Done 2026-11-24. The policy does nothing until the instance's volume carries that tag
+- [x] ACM certificate in `us-east-1` for `powermealstj.com`, `www` and `staging`, issued 2026-11-24. Its validation CNAMEs in Cloudflare must stay for renewals
+- [x] Cloudflare API token `power-meals cert` (DNS: Edit on `powermealstj.com` only, no expiry) for the origin certificate's DNS challenge, created and verified 2026-11-24. The value is in the password manager; it goes into `/etc/letsencrypt/cloudflare.ini` in section 0
+- [x] SNS topic `power-meals-alerts` in `us-west-2`, email subscription confirmed 2026-11-24. Section 10 uses its ARN for the CloudWatch alarms (`aws sns list-topics --region us-west-2`)
 - [ ] Aviso de privacidad: legal name, address, privacy mailbox, legal review
 
 ### Server
 
 Follow [`docs/ec2-setup.md`](./docs/ec2-setup.md) in order:
 
-- [ ] Section 0: launch the instance (encrypted volume, instance role, Elastic IP, `origin.powermealstj.com`), install Node 22, PostgreSQL 18, Redis and Nginx, the origin certificate through the DNS challenge, and the ACM certificate in `us-east-1`
+- [ ] Section 0: launch the instance (encrypted volume tagged `Backup=power-meals`, the `power-meals-ec2` role, Elastic IP, `origin.powermealstj.com`), install Node 22, PostgreSQL 18, Redis and Nginx, and the origin certificate through the DNS challenge
 - [ ] Sections 1–5: app user, PostgreSQL, Redis with persistence on, security groups (SSH through Session Manager or the admin IP)
 - [ ] Production `.env`, including `NEXT_PUBLIC_SITE_URL=https://powermealstj.com`, Sentry with `NEXT_PUBLIC_SENTRY_ENVIRONMENT=production`, and the `HEARTBEAT_*` URLs. Back up `PASSWORD_PEPPER` with the database credentials
 - [ ] Deploy (build after `.env` is final), seed, and one staff account per kitchen
 - [ ] Notify, dispatch, watchdog and backup timers; unpause their Healthchecks.io checks
 - [ ] CloudFront IP list and its timer, then Nginx
 - [ ] CloudFront behaviors, including `/monitoring*` with all HTTP methods for Sentry
-- [ ] CloudWatch: rsyslog, agent, SNS topic (confirm the subscription email), metric filters and alarms
+- [ ] CloudWatch: rsyslog, agent, metric filters and alarms on the existing `power-meals-alerts` topic (in a new shell, set `TOPIC` from `aws sns list-topics` first)
 - [ ] Run one backup and restore it into a scratch database
 
 ### Smoke test

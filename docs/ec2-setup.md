@@ -39,8 +39,8 @@ EC2 console → **Launch instance**:
 | Key pair | None (use Session Manager), or one kept offline | No SSH port is opened in section 5. |
 | Network | Default VPC, a public subnet, auto-assign public IP off (the Elastic IP replaces it) | |
 | Security group | New, `power-meals`, rules from [section 5](#5-security-groups) | |
-| Storage | 30 GiB gp3, **Encrypted: yes** (default `aws/ebs` key) | The PostgreSQL data lives here. Encryption cannot be turned on later. |
-| IAM instance profile | New role `power-meals-ec2` with `AmazonSSMManagedInstanceCore` and `CloudWatchAgentServerPolicy` | Shell access without SSH, and the CloudWatch agent (section 10). SES, SQS and the backup bucket are added to this role later (sections 6 and 11). |
+| Storage | 30 GiB gp3, **Encrypted: yes** (default `aws/ebs` key), volume tag `Backup=power-meals` | The PostgreSQL data lives here. Encryption cannot be turned on later. The tag is what the daily snapshot policy (section 11) looks for. |
+| IAM instance profile | Role `power-meals-ec2` (new, or created ahead in IAM as an EC2 role) with `AmazonSSMManagedInstanceCore` and `CloudWatchAgentServerPolicy` | Shell access without SSH, and the CloudWatch agent (section 10). SES, SQS and the backup bucket are added to this role later (sections 6 and 11). |
 | Advanced → Termination protection | Enable | |
 | Advanced → Metadata version | V2 only (token required) | The default for new instances; keep it. |
 
