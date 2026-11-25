@@ -2,12 +2,19 @@
 // Prices in MXN cents. Filter tags are merchandising and meant for ops review.
 import type { MealPackageRules } from "../db/schema";
 
+// Menu categories, in tab order. The protein families come first and are assigned from each plate's protein
+// (proteinFamily below); the goals are tagged per plate in templateRows.
 export const filterSeed = [
+  { slug: "pollo", label: "Pollo" },
+  { slug: "res", label: "Res" },
+  { slug: "pescado", label: "Pescado" },
   { slug: "alto-proteina", label: "Alto en proteína" },
   { slug: "alto-carbohidrato", label: "Alto en carbohidrato" },
   { slug: "bajas-calorias", label: "Bajo en calorías" },
-  { slug: "vegetariano", label: "Vegetariano" },
 ] as const;
+
+type FilterSlug = (typeof filterSeed)[number]["slug"];
+type ProteinFamily = Extract<FilterSlug, "pollo" | "res" | "pescado">;
 
 export const portionSeed = [
   {
@@ -65,7 +72,17 @@ type TemplateSeed = {
   protein: (typeof proteinSeed)[number]["slug"];
   base: (typeof baseSeed)[number]["slug"];
   sauce?: string;
-  filters: (typeof filterSeed)[number]["slug"][];
+  filters: Exclude<FilterSlug, ProteinFamily>[];
+};
+
+const proteinFamily: Record<(typeof proteinSeed)[number]["slug"], ProteinFamily> = {
+  pollo: "pollo",
+  asada: "res",
+  sirloin: "res",
+  arrachera: "res",
+  molida: "res",
+  basa: "pescado",
+  salmon: "pescado",
 };
 
 const templateRows: TemplateSeed[] = [
@@ -108,7 +125,7 @@ export const templateSeed = templateRows.map((row) => ({
   imageUrl: imageFor[row.protein],
   skuRegular: sku(row.sku),
   skuPlus: sku(row.sku + 1),
-  filters: row.filters,
+  filters: [proteinFamily[row.protein], ...row.filters],
 }));
 
 type PackageProduct = {

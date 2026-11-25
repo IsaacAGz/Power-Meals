@@ -150,6 +150,13 @@ async function seedCatalog(tx: SeedTx) {
       set: { label: sql`excluded.label`, sortOrder: sql`excluded.sort_order` },
     })
     .returning({ id: schema.catalogFilters.id, slug: schema.catalogFilters.slug });
+  // Retired categories (e.g. "vegetariano") go away; their template links cascade.
+  await tx.delete(schema.catalogFilters).where(
+    notInArray(
+      schema.catalogFilters.slug,
+      filterSeed.map((filter) => filter.slug),
+    ),
+  );
   const filterId = new Map(filterRows.map((row) => [row.slug, row.id]));
 
   await tx

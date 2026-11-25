@@ -58,6 +58,7 @@ export function MealBuilder({
   const [row, setRow] = useState<OpenRow>(() => (start ? rowFromTemplate(start) : emptyRow()));
   const [pending, setPending] = useState(false);
   const [showAllTemplates, setShowAllTemplates] = useState(false);
+  const [category, setCategory] = useState("todos");
   const templateListRef = useRef<HTMLUListElement>(null);
   const [templateClip, setTemplateClip] = useState<{ collapsed: number; full: number } | null>(null);
 
@@ -90,9 +91,18 @@ export function MealBuilder({
   const featuredSlugs = new Set(featured.map((template) => template.slug));
   const hiddenCount = catalog.templates.length - featured.length;
 
+  // Categories with at least one plate, so a chip never opens an empty list.
+  const categories = catalog.filters.filter((filter) =>
+    catalog.templates.some((template) => template.filters.includes(filter.slug)),
+  );
+  const shownTemplates =
+    category === "todos" ? catalog.templates : catalog.templates.filter((template) => template.filters.includes(category));
+  // "Ver más" folds the full list only; a category shows all of its plates.
+  const collapsible = category === "todos" && hiddenCount > 0;
+
   useLayoutEffect(() => {
     const list = templateListRef.current;
-    if (!list || hiddenCount === 0) return;
+    if (!list || !collapsible) return;
 
     const measure = () => {
       const nodes = [...list.querySelectorAll<HTMLElement>("[data-basic]")];
@@ -109,7 +119,7 @@ export function MealBuilder({
     observer.observe(list);
     for (const item of list.children) observer.observe(item);
     return () => observer.disconnect();
-  }, [hiddenCount, catalog.templates]);
+  }, [collapsible, catalog.templates]);
 
   return (
     <div className="flex min-w-0 flex-col gap-8">
@@ -240,7 +250,7 @@ export function MealBuilder({
       <div className="min-w-0">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <p className="text-sm font-semibold text-ink">Platillos sugeridos</p>
-          {hiddenCount > 0 && (
+          {collapsible && (
             <button
               type="button"
               aria-expanded={showAllTemplates}
@@ -251,14 +261,36 @@ export function MealBuilder({
             </button>
           )}
         </div>
+        {categories.length > 0 && (
+          <div role="group" aria-label="Categorías de platillos" className="mt-3 flex flex-wrap gap-1.5">
+            {[{ slug: "todos", label: "Todos" }, ...categories].map((filter) => {
+              const active = filter.slug === category;
+              return (
+                <button
+                  key={filter.slug}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setCategory(filter.slug)}
+                  className={`h-8 rounded-control border px-3 text-[13px] font-semibold transition-colors duration-200 active:scale-[0.98] ${
+                    active ? "border-ink bg-ink text-cream" : "border-line bg-transparent text-muted hover:border-ink hover:text-ink"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <ul
           ref={templateListRef}
           className="relative mt-3 flex min-w-0 flex-wrap gap-2 overflow-hidden transition-[max-height] duration-500 ease-out-expo motion-reduce:transition-none"
           style={
-            templateClip ? { maxHeight: showAllTemplates ? templateClip.full : templateClip.collapsed } : undefined
+            collapsible && templateClip
+              ? { maxHeight: showAllTemplates ? templateClip.full : templateClip.collapsed }
+              : undefined
           }
         >
-            {catalog.templates.map((template) => {
+            {shownTemplates.map((template) => {
               const preview = resolveMeal(catalog, {
                 protein: template.protein,
                 base: template.base,
@@ -268,7 +300,7 @@ export function MealBuilder({
               });
               const selected = row.protein === template.protein && row.base === template.base;
               const basic = featuredSlugs.has(template.slug);
-              const concealed = !showAllTemplates && !basic;
+              const concealed = collapsible && !showAllTemplates && !basic;
               return (
                 <li key={template.slug} data-basic={basic ? "" : undefined} inert={concealed} className="max-w-full">
                   <button
@@ -291,7 +323,7 @@ export function MealBuilder({
                 </li>
               );
             })}
-          {hiddenCount > 0 && (
+          {collapsible && (
             <div
               aria-hidden
               className={`pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-cream from-20% to-transparent transition-opacity duration-500 ease-out-expo motion-reduce:transition-none ${
