@@ -18,14 +18,14 @@ Do this once, before section 1. It creates the instance, its fixed address and D
 ### Decisions first
 
 - **Region.** `us-west-2` (Oregon), the default in `.env.example`. SES, SQS, S3 and the instance all use this one `AWS_REGION`.
-- **DNS.** The commands below assume `powermealstj.com` is a Cloudflare DNS zone (the old static site is deployed there). For Route 53, see the note under [Origin certificate](#origin-certificate-nginx).
+- **DNS.** The commands below assume `powermealstj.com` is a Cloudflare DNS zone. For Route 53, see the note under [Origin certificate](#origin-certificate-nginx).
 - **Hostnames.**
 
   | Name | Points at | Used for |
   |---|---|---|
   | `origin.powermealstj.com` | The Elastic IP (A record; in Cloudflare, **DNS only**, not proxied) | CloudFront's origin. Browsers never use it. |
   | `staging.powermealstj.com` | The CloudFront distribution (CNAME) | The smoke test before the cutover. Turnstile allows it as a subdomain of `powermealstj.com`. |
-  | `powermealstj.com`, `www` | The old static site until the [cutover](../PLAN.md#production-cutover), then CloudFront | The live site |
+  | `powermealstj.com`, `www` | CloudFront, from the [cutover](../PLAN.md#production-cutover) on (nothing is served there before it) | The live site |
 
 ### Launch the instance
 
@@ -39,8 +39,8 @@ EC2 console → **Launch instance**:
 | Key pair | None (use Session Manager), or one kept offline | No SSH port is opened in section 5. |
 | Network | Default VPC, a public subnet, auto-assign public IP off (the Elastic IP replaces it) | |
 | Security group | New, `power-meals`, rules from [section 5](#5-security-groups) | |
-| Storage | 30 GiB gp3, **Encrypted: yes** (default `aws/ebs` key) | The PostgreSQL data lives here. Encryption cannot be turned on later. |
-| IAM instance profile | New role `power-meals-ec2` with `AmazonSSMManagedInstanceCore` and `CloudWatchAgentServerPolicy` | Shell access without SSH, and the CloudWatch agent (section 10). SES, SQS and the backup bucket are added to this role later (sections 6 and 11). |
+| Storage | 30 GiB gp3, **Encrypted: yes** (default `aws/ebs` key), volume tag `Backup=power-meals` | The PostgreSQL data lives here. Encryption cannot be turned on later. The tag is what the daily snapshot policy (section 11) looks for. |
+| IAM instance profile | Role `power-meals-ec2` (new, or created ahead in IAM as an EC2 role) with `AmazonSSMManagedInstanceCore` and `CloudWatchAgentServerPolicy` | Shell access without SSH, and the CloudWatch agent (section 10). SES, SQS and the backup bucket are added to this role later (sections 6 and 11). |
 | Advanced → Termination protection | Enable | |
 | Advanced → Metadata version | V2 only (token required) | The default for new instances; keep it. |
 
@@ -672,7 +672,3 @@ curl -s http://127.0.0.1:3000/api/health
 Check `/kitchen/dashboard` and one receipt. Drop `powermeals_broken_*` once you are sure it is not needed. Redis sessions still point at user ids from the old database. They stay valid as long as the users exist in the dump. Otherwise, `redis-cli -a '<password>' -n 0 flushdb` signs everyone out.
 
 **Restore a whole volume (instance or disk lost).** In the EC2 console, find the newest snapshot tagged `Backup=power-meals`. Create a volume from it in the instance's availability zone, with encryption on. Then either attach it to a replacement instance in place of the lost volume, or attach it as a second disk and copy what is needed off it. PostgreSQL replays its WAL on first start. If the snapshot is older than the newest S3 dump, restore that dump on top using the steps above.
-
-## Cloudflare static deploy
-
-The site live on Cloudflare Workers today is an older static export. `main` is now the Node app and no longer has `output: "export"`, so it cannot produce `out/`: do not run `wrangler deploy` from it. The static deploy stays up as the fallback until the production cutover, then it is retired (see [PLAN.md](../PLAN.md#production-cutover)).

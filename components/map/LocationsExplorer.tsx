@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowRight, Lightning, MapPin } from "@phosphor-icons/react";
+import { ArrowRight, ArrowUpRight, Clock, Lightning, MapPin } from "@phosphor-icons/react";
 import { mapPins } from "@/lib/locations-data";
 
 const BrandMap = dynamic(() => import("./BrandMap"), {
@@ -62,21 +62,47 @@ export function LocationsExplorer() {
                     <span>
                       <span className="block font-display text-xl font-bold tracking-tight">{point.name}</span>
                       {point.address ? (
-                        <span className="mt-1 flex items-center gap-1 text-sm text-muted">
-                          <MapPin weight="bold" className="size-3.5" aria-hidden />
+                        <span className="mt-1 flex items-start gap-1.5 text-sm text-muted">
+                          <MapPin weight="bold" className="mt-[3px] size-3.5 shrink-0" aria-hidden />
                           {point.address}
                         </span>
                       ) : null}
-                      {point.hours ? <span className="mt-1 block text-[13px] text-muted">{point.hours}</span> : null}
                     </span>
                   </button>
-                  <Link
-                    href="/pedido"
-                    className="group mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-ink underline decoration-power decoration-2 underline-offset-4 hover:decoration-ink"
-                  >
-                    Hacer un pedido
-                    <ArrowRight weight="bold" className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-                  </Link>
+                  {point.hoursRows.length ? (
+                    <div className="mt-4 flex items-start gap-1.5 pl-14 text-[13px]">
+                      <Clock weight="bold" className="mt-[2px] size-3.5 shrink-0 text-muted" aria-hidden />
+                      <dl aria-label={`Horario de ${point.name}`} className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
+                        {point.hoursRows.map((row) => (
+                          <div key={row.days} className="contents">
+                            <dt className="text-muted">{row.days}</dt>
+                            <dd className={`font-mono tabular-nums ${row.hours === "Cerrado" ? "text-muted" : "text-ink"}`}>
+                              {row.hours}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  ) : null}
+                  <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 pl-14">
+                    <Link
+                      href="/pedido"
+                      className="group inline-flex items-center gap-1.5 text-sm font-semibold text-ink underline decoration-power decoration-2 underline-offset-4 hover:decoration-ink"
+                    >
+                      Hacer un pedido
+                      <ArrowRight weight="bold" className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                    </Link>
+                    <a
+                      href={point.mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Cómo llegar a ${point.name} en Google Maps (se abre en otra pestaña)`}
+                      className="group inline-flex items-center gap-1.5 text-sm font-semibold text-ink underline decoration-line-strong decoration-2 underline-offset-4 hover:decoration-ink"
+                    >
+                      Cómo llegar
+                      <ArrowUpRight weight="bold" className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                    </a>
+                  </div>
                 </div>
               </li>
             );
