@@ -1,6 +1,6 @@
 # Power Meals
 
-Source brief for a portfolio case study. Rewrite this in the portfolio's voice. Keep the facts. Do not add metrics, client quotes, revenue, or launch claims that are not in this document.
+Source brief for a portfolio case study. Rewrite this in the portfolio's voice. Keep the facts. Do not add metrics, client quotes, revenue, or launch claims that are not in this document. Power Meals is a real business; the site is being launched for it, so keep what is live and what is not stated as this document states it.
 
 The runtime model for anyone changing the code is [`.cursor/rules/application.mdc`](./.cursor/rules/application.mdc). This file is the case-study source. When they disagree, follow the code.
 
@@ -14,7 +14,7 @@ I designed and built the product end to end: information architecture, visual sy
 
 ## The product
 
-Power Meals is a local meal-prep brand in Tijuana, Baja California. The offer is weekly high-protein meals, cooked and packed so the customer heats and eats. The audience is urban and local: people training, working, and ordering in Spanish (Mexico).
+Power Meals is a local meal-prep brand in Tijuana, Baja California. It cooks in the kitchens of Carreta 22, a Tijuana restaurant group and one of its two partners. The offer is weekly high-protein meals, cooked and packed so the customer heats and eats. The audience is urban and local: people training, working, and ordering in Spanish (Mexico).
 
 The banner is: **Comida real. Energía real. Resultados reales.**
 
@@ -30,15 +30,17 @@ There is still no card charge on the live path, and no WhatsApp Business message
 | `/nosotros` | Editorial about page. Origin story and what the kitchen cares about: local ingredients, protein, ready-for-the-week packaging, and proximity. |
 | `/menu` | Menu of suggested plates, with filters. Each plate can start an order. Copy switches when card payment is on. |
 | `/ubicaciones` | Map of the four kitchens. Choosing one flies the map there. Pickup at checkout uses these same kitchens. |
-| `/proyectos` | Partner page for gyms, studios, and offices. Logo row and two case rows, plus a WhatsApp prompt for businesses that want to partner. |
+| `/proyectos` | Partners: Casa Toro (cabin rentals) and Carreta 22 (restaurants), each with its logo and web or Instagram links, plus a call to `/contacto` for gyms, offices, and events. |
+| `/contacto` | Requests from gyms (become a public pickup point), offices (a plan for a team), and catering. The form emails the request to the business through SES. |
 | `/pedido` | Plate builder, suggested plates, POWER packages, cart, and checkout. |
 | `/pedido/success`, `/pedido/cancel` | Sessionless receipt by `order_ref`. The success page shows each kitchen step and polls until the order is completed or cancelled. |
 | `/ingresar`, `/registro`, `/cuenta`, `/historial` | Customer sign-in, registration, profile, and order history. |
 | `/verificar` | Email confirmation link. Opening it signs the person in. |
 | `/recuperar`, `/recuperar/nueva` | Password reset request and the one-time new-password page. |
+| `/aviso-de-privacidad` | Privacy notice under the 2025 LFPDPPP, linked from the footer, registration, and checkout. The legal name and address are still placeholders. |
 | `/kitchen/dashboard` | Staff only, scoped to one kitchen. Marketing header and footer are hidden. |
 
-Shared chrome: sticky header (logo, nav, persistent "Pedir" button, full-screen mobile menu), footer with the WhatsApp number, and a skip link.
+Shared chrome: sticky header (Power Meals wordmark, nav, persistent "Pedir" button, theme toggle, full-screen mobile menu), footer with the WhatsApp number, and a skip link.
 
 ## Ordering
 
@@ -72,22 +74,23 @@ Kitchen staff are a separate role, tied to one facility. Public registration cre
 
 ## Kitchen
 
-`/kitchen/dashboard` loads only the staff member's facility. It polls every 10 seconds, pauses while the tab is hidden, and rolls back an optimistic status change the server rejects. The client sends the expected current status so a double click cannot skip a step. Staff see phone, fulfillment, notes, grams, style, and salsa.
+`/kitchen/dashboard` loads only the staff member's facility. It polls every 10 seconds, pauses while the tab is hidden, and rolls back an optimistic status change the server rejects. The client sends the expected current status so a double click cannot skip a step. Staff see phone, fulfillment, notes, grams, style, and salsa. A new order plays a short chime and shows a "Nuevo" badge. It is a web page, so it runs on a tablet or phone browser.
 
-The ticket is an 80mm Spanish receipt. A small Node daemon pulls one Amazon SQS queue, prints tickets for its own kitchen, and hands other kitchens' messages back. The queue has been verified against a local stand-in. A real AWS queue has not been exercised.
+The ticket is an 80mm Spanish receipt. A small Node daemon pulls one Amazon SQS queue, prints tickets for its own kitchen, and hands other kitchens' messages back. The queue has been verified against a local stand-in. A real AWS queue has not been exercised. The daemon needs an always-on computer in each kitchen and prints to a network (raw port 9100) or USB ESC/POS printer. Kitchen tablets and printers have not been bought yet.
 
 ## What is real and what is still off
 
 Say this plainly if the portfolio mentions content or launch. Do not present stand-ins as a live catalog, a client roster, or a production deploy.
 
-- The catalog the app prices is seeded in PostgreSQL: seven proteins, five bases, nineteen suggested plates, and POWER Chicken / POWER Mix at 6, 10, and 15 meals. Regular plates start at $139 MXN and Plus at $179 MXN. Premium proteins add a per-plate upgrade. Food photography reuses stand-in images until a menu shoot.
-- Partner names and case studies on `/proyectos` are placeholders, marked that way in the source.
+- The catalog the app prices is seeded in PostgreSQL: seven proteins, five bases, nineteen suggested plates, and POWER Chicken / POWER Mix at 6, 10, and 15 meals. Regular plates start at $139 MXN and Plus at $179 MXN. Premium proteins add a per-plate upgrade. Food and site photography are stand-in images until a shoot after the first server deploy.
+- The partners on `/proyectos`, Casa Toro and Carreta 22, are real.
+- The privacy notice is a draft: legal name, address, and privacy mailbox are placeholders until legal review, which comes after the server test deployment.
 - Map pins are the four kitchen coordinates. They have no street address, and the checkout choice does not invent one.
 - Bank, CLABE, and account holder are intentionally absent. The kitchen sends those details on WhatsApp after the order.
 - Card payment (Openpay) is implemented and off until merchant credentials exist. The site copy says transfer, not card.
 - Delivery is shown and cannot be selected.
 - Paid-order email needs `ORDER_EMAIL_FROM`. Paid-order WhatsApp needs an approved Spanish utility template and three Cloud API env vars. The kitchen printer needs `SQS_QUEUE_URL`. Each of those stays skipped until it is set.
-- The app runs locally on Node, PostgreSQL, and Redis. Production cutover to EC2 and `powermealstj.com` is not done. The old Cloudflare static deploy is still in the repo and is not the current app.
+- The app runs locally on Node, PostgreSQL, and Redis. Production cutover to EC2 and `powermealstj.com` is not done. The earlier static site on Cloudflare has been taken down.
 
 ## Tech stack
 
@@ -110,15 +113,16 @@ Say this plainly if the portfolio mentions content or launch. Do not present sta
 
 ## Visual system
 
-Clean and minimal, light only. No dark mode.
+Clean and minimal. Light by default, with a dark mode the visitor can switch to; the choice is applied before first paint so the page does not flash.
 
-- Ink `#111111` (not pure black), paper `#FFFFFF`, cream `#F5F1E8`, one accent: Power Yellow `#F5C400`
+- Colors are role tokens in `app/globals.css` (`cream` page, `paper` card, `ink` text and inverse surface) that dark mode redefines. A few never flip: text over photos, map pins, always-dark bands.
+- Light values: ink `#111111` (not pure black), paper `#FFFFFF`, cream `#F5F1E8`, one accent: Power Yellow `#F5C400`
 - Muted text `#5E5A52`, hairline borders at 8% and 16% ink
 - Controls and inputs use a 6px radius. Cards, photos, and the map frame use 12px. No pills.
 - Buttons are shared class strings in `lib/ui.ts`: yellow primary, ink outline secondary, ink dark. Press scales to 0.98. Hover on the yellow button deepens to `#E3B500`.
 - Prices use tabular monospace.
 - Motion is short and eased (`cubic-bezier(0.16, 1, 0.3, 1)`). Every animation checks `prefers-reduced-motion` and renders the final state immediately when it is on.
-- Copy is Spanish (Mexico). UI chrome uses the lightning mark from `public/logo.svg`, not an emoji.
+- Copy is Spanish (Mexico). The header uses the Power Meals wordmark; UI chrome uses the lightning mark, not an emoji.
 
 The home hero is a brand statement, not a dashboard: one headline, one short support line, two actions ("Ver menú", "Pedir"), and one full-bleed food photograph. No stat strip, no badge row, no card grid in the first viewport.
 
@@ -126,7 +130,7 @@ The order page has to stay usable on a phone. The builder, suggested plates, car
 
 ## Architecture
 
-Marketing pages are server-rendered. Client JavaScript is limited to the interactions that need it: the mobile menu, the menu filters, the plate builder and cart, checkout, the map, auth forms, the receipt poll, and the kitchen board.
+Marketing pages are server-rendered. Client JavaScript is limited to the interactions that need it: the mobile menu, the theme toggle, the contact form, the menu filters, the plate builder and cart, checkout, the map, auth forms, the receipt poll, and the kitchen board.
 
 An order is one database transaction: `orders`, frozen `order_line_items`, one `payments` row, and the first `order_status_events` row. Package lines are one priced header plus zero-price slot rows. The kitchen is copied from the pickup point at that moment. Guest carts live in Redis. Logged-in carts live in Postgres. Login moves the guest cart onto the user.
 
@@ -170,7 +174,7 @@ MapLibre loads a web worker relative to its own module URL. Once Next bundles th
 
 ### Accessibility is part of the motion and the forms
 
-Reduced motion is checked in the reveal component, the menu filter, the suggested-plate expand, and the map camera. The header traps body scroll while the mobile menu is open and closes on Escape and on navigation. Form errors sit on the fields. The kitchen board and the receipt poll update in place. Focus rings are ink on cream. The skip link is the first thing in the page.
+Reduced motion is checked in the reveal component, the menu filter, the suggested-plate expand, and the map camera. The header traps body scroll while the mobile menu is open and closes on Escape and on navigation. Form errors sit on the fields. The kitchen board and the receipt poll update in place. Focus rings use the ink token, so they keep their contrast in both themes. The skip link is the first thing in the page.
 
 ## Suggested portfolio framing
 
@@ -192,5 +196,6 @@ Reduced motion is checked in the reveal component, the menu filter, the suggeste
 - That card payment is available to customers, or that a WhatsApp order is paid when it is placed
 - That the site messages customers on WhatsApp today, or that a real kitchen printer has taken a ticket from AWS
 - That delivery is available
-- That the food photography, partner names, or case studies are final business assets
+- That the food or site photography is final
+- That the privacy notice is final
 - A production deploy on EC2 or `powermealstj.com`

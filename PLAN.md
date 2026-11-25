@@ -19,7 +19,7 @@ The retail app is built and running locally. This file is what is left before an
 
 ## Before production
 
-Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cloud API message and kitchen printing are [turned on later](#turn-on-later); none of them blocks the launch.
+Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cloud API message and kitchen printing are [turned on later](#turn-on-later); none of them blocks the launch. Neither do the [kitchen devices](#kitchen-devices) or the [privacy notice](#after-the-smoke-test): staff can use the dashboard from any phone or laptop browser.
 
 ### Code
 
@@ -28,7 +28,6 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 - [x] **Nginx client IP behind CloudFront.** [`deploy/nginx/powermeals.conf`](./deploy/nginx/powermeals.conf) restores the viewer IP from CloudFront's origin-facing ranges, which `scripts/cloudfront-real-ip.mjs` writes and a daily timer refreshes. See [`docs/ec2-setup.md`](./docs/ec2-setup.md#7-nginx)
 - [x] **Fields before hydration.** A pick or keystroke on `/pedido` before React hydrated was reset (dropdowns, radios and text alike). The order UI now sits in a fieldset that stays disabled until hydration (`components/useHydrated.ts`), with a Playwright test that holds the JavaScript
 - [x] **Aviso de privacidad page.** `/aviso-de-privacidad`, linked from the footer, both registration forms and checkout. The draft text describes what the app does (data, providers, retention, the `pm_session` cookie, allergies in order notes as sensitive data) under the 2025 LFPDPPP
-- [ ] **Aviso de privacidad before launch.** Replace the bracketed legal name and address in `PRIVACY` ([`lib/constants.ts`](./lib/constants.ts)), create the `privacidad@powermealstj.com` mailbox, and have a lawyer review the text
 - [x] **CI.** [`.github/workflows/ci.yml`](./.github/workflows/ci.yml): lint, typecheck, unit and component tests and a production build on every push; integration and Playwright tests against PostgreSQL 18 and Redis 8 containers; the print daemon typecheck
 - [x] Merge `pedir-change` and `observability` into the main branch and push.
 
@@ -44,7 +43,6 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 - [x] ACM certificate in `us-east-1` for `powermealstj.com`, `www` and `staging`, issued 2026-11-24. Its validation CNAMEs in Cloudflare must stay for renewals
 - [x] Cloudflare API token `power-meals cert` (DNS: Edit on `powermealstj.com` only, no expiry) for the origin certificate's DNS challenge, created and verified 2026-11-24. The value is in the password manager; it goes into `/etc/letsencrypt/cloudflare.ini` in section 0
 - [x] SNS topic `power-meals-alerts` in `us-west-2`, email subscription confirmed 2026-11-24. Section 10 uses its ARN for the CloudWatch alarms (`aws sns list-topics --region us-west-2`)
-- [ ] Aviso de privacidad: legal name, address, privacy mailbox, legal review
 
 ### Server
 
@@ -62,7 +60,7 @@ Follow [`docs/ec2-setup.md`](./docs/ec2-setup.md) in order:
 
 ### Smoke test
 
-On a temporary hostname pointed at EC2, before moving DNS:
+On `staging.powermealstj.com` (CloudFront in front of EC2), before moving DNS:
 
 - [ ] Register, confirm the email, sign in, reset the password
 - [ ] WhatsApp order as a guest and signed in
@@ -70,12 +68,27 @@ On a temporary hostname pointed at EC2, before moving DNS:
 - [ ] A test error reaches Sentry through CloudFront; app log lines reach CloudWatch
 - [ ] The order flow on a real phone over mobile data
 
+## After the smoke test
+
+Once the server, services and kitchen devices are connected:
+
+- [ ] **Aviso de privacidad.** Replace the bracketed legal name and address in `PRIVACY` ([`lib/constants.ts`](./lib/constants.ts)), create the `privacidad@powermealstj.com` mailbox, and have a lawyer review the text
+- [ ] **Photography.** The food and site photos are stand-ins; replace them after a shoot
+
 ## Production cutover
 
 - [ ] Point `powermealstj.com` at CloudFront/EC2
 - [ ] UptimeRobot: keyword monitor on `https://powermealstj.com/` (`Power Meals`), HTTP monitor on `/menu`, SSL expiry alerts
-- [ ] Watch Sentry and Healthchecks.io for the first hour; keep the Cloudflare static deploy as a fallback
-- [ ] After a few stable days, retire the Cloudflare static deploy and move [`wrangler.jsonc`](./wrangler.jsonc) guidance to `docs/legacy-static-deploy.md`
+- [ ] Watch Sentry and Healthchecks.io for the first hour. There is no static fallback (the Cloudflare Worker was deleted); roll back with `scripts/deploy.sh rollback`
+
+## Kitchen devices
+
+Not bought yet. The kitchens are Carreta 22's.
+
+- [ ] **Dashboard screen per kitchen.** `/kitchen/dashboard` is a web page, so a tablet or phone works. Keep the screen on and the tab in front: the board stops polling while the tab is hidden, and the new-order chime needs one tap on the page before the browser lets it play
+- [ ] **Printer per kitchen.** The daemon sends ESC/POS to an 80 mm printer over the network (`tcp://<ip>:9100`) or USB (`file:/dev/usb/lp0`). The restaurant's existing receipt printers work if they speak ESC/POS on Ethernet/Wi-Fi or USB; Bluetooth-only printers and label printers (ZPL, Brother) are not supported
+- [ ] **Always-on computer per kitchen for the print daemon.** A tablet or phone cannot run it. A Raspberry Pi, a mini PC or an old laptop on the kitchen network is enough
+- [ ] Then the [real kitchen queue](#real-kitchen-queue)
 
 ## Turn on later
 
