@@ -166,7 +166,7 @@ export function ContactForm({ initialKind }: { initialKind: ContactKind | "" }) 
           )}
         </FormField>
         {tipo !== "catering" && (
-          <label className="flex cursor-pointer items-center gap-3 self-end rounded-control border border-line-strong bg-paper px-3.5 py-3 text-[15px] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ink sm:h-12">
+          <label className="flex cursor-pointer items-center gap-3 self-start rounded-control border border-line-strong bg-paper px-3.5 py-3 text-[15px] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ink sm:mt-7 sm:h-12">
             <input type="checkbox" name="refrigerador" className="size-4 accent-power" />
             Necesitamos refrigerador
           </label>
