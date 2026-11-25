@@ -50,7 +50,7 @@ A plate is base, protein, tamaño (Regular or Plus), estilo (Balanceado or Doble
 
 Suggested plates sit under the builder. A few stay visible. The rest are behind "Ver más platillos," which expands with a height animation and a fade so the hidden rows do not cut off hard. Choosing one fills the open row. It does not add a line by itself. Packages stay on their own tab: 6, 10, or 15 meals, Regular or Plus. A package is one priced header plus a slot per meal.
 
-Checkout is pickup only, at the four kitchens on the map: Zona Río, Otay, Plaza Monarca, and Rio Tijuana 3ra Etapa. "Entrega a domicilio" is visible and disabled. A posted delivery is rejected. The order is assigned to the kitchen of the pickup point.
+Checkout is pickup only, at the four kitchens on the map: Plaza Río, Otay, Plaza Monarca, and El Punto. Each location card on `/ubicaciones` shows the address, the weekly hours, and a "Cómo llegar" link to Google Maps. "Entrega a domicilio" is visible and disabled. A posted delivery is rejected. The order is assigned to the kitchen of the pickup point.
 
 Two ways an order is born:
 
@@ -85,7 +85,7 @@ Say this plainly if the portfolio mentions content or launch. Do not present sta
 - The catalog the app prices is seeded in PostgreSQL: seven proteins, five bases, nineteen suggested plates, and POWER Chicken / POWER Mix at 6, 10, and 15 meals. Regular plates start at $139 MXN and Plus at $179 MXN. Premium proteins add a per-plate upgrade. Food and site photography are stand-in images until a shoot after the first server deploy.
 - The partners on `/proyectos`, Casa Toro and Carreta 22, are real.
 - The privacy notice is a draft: legal name, address, and privacy mailbox are placeholders until legal review, which comes after the server test deployment.
-- Map pins are the four kitchen coordinates. They have no street address, and the checkout choice does not invent one.
+- Map pins are the four kitchen coordinates, with the street address and opening hours of each kitchen.
 - Bank, CLABE, and account holder are intentionally absent. The kitchen sends those details on WhatsApp after the order.
 - Card payment (Openpay) is implemented and off until merchant credentials exist. The site copy says transfer, not card.
 - Delivery is shown and cannot be selected.

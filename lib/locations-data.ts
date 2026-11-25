@@ -1,5 +1,5 @@
 // Delivery zones stay in the catalog for later. Checkout pickup points are the four kitchens.
-import { kitchenLocations } from "./kitchens";
+import { googleMapsUrl, groupHours, hoursLabel, kitchenLocations, type HoursRow } from "./kitchens";
 
 export type LngLat = [number, number];
 
@@ -13,21 +13,29 @@ export type PickupPoint = {
   slug: string;
   name: string;
   address: string;
+  /** One-line hours, for the map popup and `pickup_points.hours_label`. */
   hours: string;
+  /** Hours grouped by day range, for the location cards. */
+  hoursRows: HoursRow[];
+  mapsUrl: string;
   coordinates: LngLat;
 };
+
+const kitchenPoints: PickupPoint[] = kitchenLocations.map((kitchen) => ({
+  slug: kitchen.slug,
+  name: kitchen.name,
+  address: kitchen.address,
+  hours: hoursLabel(kitchen.hours),
+  hoursRows: groupHours(kitchen.hours),
+  mapsUrl: googleMapsUrl(kitchen),
+  coordinates: [kitchen.longitude, kitchen.latitude],
+}));
 
 export const MAP_CENTER: LngLat = [-116.97, 32.518];
 export const MAP_ZOOM = 11;
 
 /** Pins on /ubicaciones and the home map. Checkout pickup uses these same kitchens. */
-export const mapPins: PickupPoint[] = kitchenLocations.map((kitchen) => ({
-  slug: kitchen.slug,
-  name: kitchen.name,
-  address: "",
-  hours: "",
-  coordinates: [kitchen.longitude, kitchen.latitude],
-}));
+export const mapPins: PickupPoint[] = kitchenPoints;
 
 export const zones: Zone[] = [
   { slug: "zona-rio", name: "Zona Río", days: "Lunes, miércoles y viernes" },
@@ -37,14 +45,8 @@ export const zones: Zone[] = [
   { slug: "playas", name: "Playas de Tijuana", days: "Miércoles y sábado" },
 ];
 
-/** Checkout pickup. The name is the kitchen name; the map pins have no street address. */
-export const pickupPoints: PickupPoint[] = kitchenLocations.map((kitchen) => ({
-  slug: kitchen.slug,
-  name: kitchen.name,
-  address: "",
-  hours: "",
-  coordinates: [kitchen.longitude, kitchen.latitude],
-}));
+/** Checkout pickup: the same four kitchens, with their address and hours. */
+export const pickupPoints: PickupPoint[] = kitchenPoints;
 
 export function getZone(slug: string | undefined | null) {
   if (!slug) return undefined;

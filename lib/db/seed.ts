@@ -7,7 +7,12 @@ import * as schema from "./schema";
 
 type SeedDatabase = PgDatabase<PgQueryResultHKT, typeof schema>;
 
-export const kitchenFacilitySeed = kitchenLocations;
+export const kitchenFacilitySeed = kitchenLocations.map(({ slug, name, latitude, longitude }) => ({
+  slug,
+  name,
+  latitude,
+  longitude,
+}));
 
 type FacilitySlug = (typeof kitchenLocations)[number]["slug"];
 
@@ -55,7 +60,7 @@ export async function seed(db: SeedDatabase) {
   return db.transaction(async (tx) => {
     const facilities = await tx
       .insert(schema.kitchenFacilities)
-      .values([...kitchenFacilitySeed])
+      .values(kitchenFacilitySeed)
       .onConflictDoUpdate({
         target: schema.kitchenFacilities.slug,
         set: {

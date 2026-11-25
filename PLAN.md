@@ -34,7 +34,7 @@ Launch takes WhatsApp orders with a bank transfer. Card payment, the WhatsApp Cl
 ### Accounts and AWS console
 
 - [x] Sentry project and DSN
-- [x] Healthchecks.io: `notify-timer`, `dispatch-timer`, `watchdog`, `backup`, and the printer checks `printer-zona-rio`, `printer-otay`, `printer-monarca` and `printer-punto` (Rio Tijuana 3ra Etapa). They stay in the "new" state, which does not alert, until the server or the kitchen PC first pings them
+- [x] Healthchecks.io: `notify-timer`, `dispatch-timer`, `watchdog`, `backup`, and the printer checks `printer-zona-rio` (Plaza Río), `printer-otay`, `printer-monarca` and `printer-punto` (El Punto). They stay in the "new" state, which does not alert, until the server or the kitchen PC first pings them
 - [x] UptimeRobot account, alert email verified 2026-11-24 (monitors are added at launch)
 - [x] SES: `powermealstj.com` verified, sending from `pedidos@powermealstj.com` in `us-west-2`, production access. Confirmed 2026-11-16 by `npm run email:test` to an unverified inbox
 - [x] Cloudflare Turnstile widget for `powermealstj.com` (subdomains included) and `localhost`; keys go into the server `.env`
