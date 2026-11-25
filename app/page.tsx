@@ -6,13 +6,12 @@ import { ArrowRight, CreditCard, ForkKnife, Package, WhatsappLogo } from "@phosp
 import { PackageCards } from "@/components/PackageCards";
 import { Reveal } from "@/components/Reveal";
 import { MapTeaser } from "@/components/map/MapTeaser";
-import type { MenuCard } from "@/components/MenuBrowser";
+import { MenuCarousel } from "@/components/MenuCarousel";
 import { getCatalog } from "@/lib/catalog";
-import { menuCards } from "@/lib/catalog/menu";
+import { mixedMenuCards } from "@/lib/catalog/menu";
 import type { MealPackage } from "@/lib/catalog/types";
-import { formatCents } from "@/lib/format";
 import { isOpenpayConfigured } from "@/lib/openpay";
-import { buttonPrimary, buttonSecondary, container, textLink } from "@/lib/ui";
+import { buttonPrimary, buttonSecondary, container } from "@/lib/ui";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
@@ -31,7 +30,7 @@ export default async function Home() {
     <>
       <Hero />
       <HowItWorks openpayEnabled={openpayEnabled} />
-      <MenuRow items={menuCards(catalog)} />
+      <MenuCarousel items={mixedMenuCards(catalog)} />
       {catalog.packages.length > 0 && <PackagesSection packages={catalog.packages} />}
       <MapTeaser />
       <ClosingBand openpayEnabled={openpayEnabled} />
@@ -160,48 +159,6 @@ function HowItWorks({ openpayEnabled }: { openpayEnabled: boolean }) {
           </Reveal>
         </div>
       </div>
-    </section>
-  );
-}
-
-function MenuRow({ items }: { items: MenuCard[] }) {
-  return (
-    <section className="bg-paper py-24 md:py-32">
-      <div className={`${container} flex flex-wrap items-end justify-between gap-6`}>
-        <Reveal>
-          <h2 className="font-display text-4xl font-extrabold tracking-tight md:text-5xl">Esta semana en el menú</h2>
-        </Reveal>
-        <Link href="/menu" className={`${textLink} inline-flex items-center gap-1.5 text-[15px]`}>
-          Ver menú
-          <ArrowRight weight="bold" className="size-4" />
-        </Link>
-      </div>
-
-      <Reveal delay={0.1}>
-        <ul className="no-scrollbar mt-12 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-px-4 px-4 pb-4 sm:scroll-px-6 sm:px-6 lg:scroll-px-10 lg:px-10 min-[1400px]:px-[calc((100vw-1400px)/2+2.5rem)]">
-          {items.map((item) => (
-            <li key={item.slug} className="group w-[78vw] max-w-[340px] shrink-0 snap-start">
-              <Link href={`/pedido?plantilla=${item.slug}`} className="block rounded-frame">
-                <div className="relative aspect-[4/5] overflow-hidden rounded-frame bg-placeholder">
-                  <Image
-                    src={item.imageUrl}
-                    alt={item.name}
-                    fill
-                    sizes="340px"
-                    className="object-cover transition-transform duration-700 ease-out-expo group-hover:scale-[1.04]"
-                  />
-                </div>
-                <div className="mt-4 flex items-baseline justify-between gap-4">
-                  <h3 className="text-[16px] font-semibold leading-snug">{item.name}</h3>
-                  <span className="shrink-0 font-mono text-[15px] tabular-nums text-muted">
-                    {formatCents(item.regularCents)}
-                  </span>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Reveal>
     </section>
   );
 }

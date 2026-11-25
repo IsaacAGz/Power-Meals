@@ -290,7 +290,11 @@ export function CheckoutForm({
             </FormField>
           </div>
         ) : (
-          <FormField label="Punto de recolección" error={errors.punto}>
+          <FormField
+            label="Punto de recolección"
+            error={errors.punto}
+            hint={points.find((point) => point.slug === input.punto)?.address || undefined}
+          >
             {(props) => (
               <SelectShell>
                 <select
@@ -303,7 +307,7 @@ export function CheckoutForm({
                   <option value="">Elige un punto</option>
                   {points.map((point) => (
                     <option key={point.slug} value={point.slug}>
-                      {point.address ? `${point.name}, ${point.address}` : point.name}
+                      {point.name}
                     </option>
                   ))}
                 </select>

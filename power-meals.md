@@ -28,7 +28,7 @@ There is still no card charge on the live path, and no WhatsApp Business message
 | --- | --- |
 | `/` | Brand home. Full-viewport split hero, how ordering works, a menu strip, a map teaser, and a closing call to order. Copy switches when card payment is on. |
 | `/nosotros` | Editorial about page. Origin story and what the kitchen cares about: local ingredients, protein, ready-for-the-week packaging, and proximity. |
-| `/menu` | Menu of suggested plates, with filters. Each plate can start an order. Copy switches when card payment is on. |
+| `/menu` | Menu of suggested plates, filtered by protein (Pollo, Res, Pescado) or goal (Alto en proteína, Alto en carbohidrato, Bajo en calorías). Each plate can start an order. Copy switches when card payment is on. |
 | `/ubicaciones` | Map of the four kitchens. Choosing one flies the map there. Pickup at checkout uses these same kitchens. |
 | `/proyectos` | Partners: Casa Toro (cabin rentals) and Carreta 22 (restaurants), each with its logo and web or Instagram links, plus a call to `/contacto` for gyms, offices, and events. |
 | `/contacto` | Requests from gyms (become a public pickup point), offices (a plan for a team), and catering. The form emails the request to the business through SES. |
@@ -48,7 +48,7 @@ The sellable catalog is not a list of fixed dishes. It is proteins, carb bases, 
 
 A plate is base, protein, tamaño (Regular or Plus), estilo (Balanceado or Doble carb), and salsa (Roja or Verde). A new row opens with Regular, Balanceado, and Roja already selected. Confirmar stays disabled until base and protein are chosen too. Confirming adds one cart line at quantity 1 and leaves a new empty row underneath. A confirmed plate can change quantity (1–20) or be removed. The cart holds at most 30 lines.
 
-Suggested plates sit under the builder. A few stay visible. The rest are behind "Ver más platillos," which expands with a height animation and a fade so the hidden rows do not cut off hard. Choosing one fills the open row. It does not add a line by itself. Packages stay on their own tab: 6, 10, or 15 meals, Regular or Plus. A package is one priced header plus a slot per meal.
+Suggested plates sit under the builder. A few stay visible. The rest are behind "Ver más platillos," which expands with a height animation and a fade so the hidden rows do not cut off hard. Category chips above them (Pollo, Res, Pescado, Alto en proteína, Alto en carbohidrato, Bajo en calorías) narrow the list to one category and show all of its plates. Choosing one fills the open row. It does not add a line by itself. Packages stay on their own tab: 6, 10, or 15 meals, Regular or Plus. A package is one priced header plus a slot per meal.
 
 Checkout is pickup only, at the four kitchens on the map: Plaza Río, Otay, Plaza Monarca, and El Punto. Each location card on `/ubicaciones` shows the address, the weekly hours, and a "Cómo llegar" link to Google Maps. "Entrega a domicilio" is visible and disabled. A posted delivery is rejected. The order is assigned to the kitchen of the pickup point.
 
